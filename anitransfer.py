@@ -1,4 +1,5 @@
 import json
+import time
 from jikanpy import Jikan
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
@@ -66,6 +67,8 @@ for i in data['entries']:
 
     #title.text = "<![CDATA[" + i['name'] + "]]>"
     title.text = i['name']
+    print(i['name'])
+    time.sleep(4)
     #try:
         #jfile = jikan.search('anime', i['name'])
     #except:
