@@ -34,8 +34,9 @@ def log(type, name, jname=None, count=0):
     elif type == 3: strlog = "ERROR: Duplicate - " + name + " ---> " + jname
     else: strlog = str(count) + ": " + name + " ---> " + jname
 
-    with open(logfile, 'a') as f:
-        f.write(strlog + '\n')
+    if type == 1 or type == 2 or type == 3:
+        with open(logfile, 'a') as f:
+            f.write(strlog + '\n')
     print(strlog)
 
 def cache(name, malid):
