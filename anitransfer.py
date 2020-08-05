@@ -102,17 +102,19 @@ def jverify(name, jdata):
     return False
 
 def main():
+    #Make log and load data
     createLog()
     data = loadJSON(test1)
-    
+
+    #Start XML structure
     root = ET.Element('myanimelist')
     info = ET.SubElement(root, 'myinfo')
     uname = ET.SubElement(info, 'user_name')
     total = ET.SubElement(info, 'user_total_anime')
-
     uname.text = data['user']['name']
     total.text = str(len(data['entries']))
-    
+
+    #Initiate Jikan
     jikan = Jikan()
     
     count = 0
@@ -149,7 +151,8 @@ def main():
             continue
         
         store.append(jname)
-        
+
+        #Convert status
         stat = i['status']
         if stat == 'watched': stat = 'Completed'
         elif stat == 'watching': stat = 'Watching'
@@ -157,7 +160,8 @@ def main():
         elif stat == 'stalled': stat = 'On-Hold'
         elif stat == 'dropped': stat = 'Dropped'
         elif stat == "won't watch": continue
-            
+
+        #Populate anime XML entry
         entry = ET.SubElement(root, 'anime')
         malid = ET.SubElement(entry, 'series_animedb_id')
         title = ET.SubElement(entry, 'series_title')
@@ -167,12 +171,11 @@ def main():
         score = ET.SubElement(entry, 'my_score')
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
-
-        malid.text = str(jdata['results'][0]['mal_id'])
-
+        
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
+        malid.text = str(jdata['results'][0]['mal_id'])
         if str(i['started']) == "None": wsd.text = "0000-00-00"
         else: wsd.text = str(i['started']).split()[0]
         if str(i['completed']) == "None": wfd.text = "0000-00-00"
@@ -189,6 +192,7 @@ def main():
         #MUST use 4 second delay for Jikan's rate limit
         delayCheck()
 
+    #Export XML to convert file
     tree = ET.ElementTree(root)
     dom = minidom.parseString(ET.tostring(root))
     dom = dom.toprettyxml(indent='\t')
