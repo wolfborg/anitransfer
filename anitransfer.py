@@ -1,42 +1,123 @@
-import json
-import time
 from jikanpy import Jikan
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
+import json, time, datetime, math
+
+delay = 4
+logfile = 'log.txt'
+qtime = datetime.datetime.now()
+
+#Anime Planet JSON files
+test1 = "samples/export-anime-SomePoorKid.json"
+test2 = "samples/export-anime-princessdaisy41_2.json"
+
+#Loads JSON file
+def loadJSON(filename):
+    f = open(filename)
+    data = json.load(f)
+    f.close()
+    return data
+
+#Creates log text file with datetime as name
+def createLog():
+    global logfile
+    dtime = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    logfile = 'logs/log_' + dtime + '.txt'
+    f = open(logfile, 'w')
+    f.close()
+
+#Prints logs and errors and appends to log file
+def log(type, name, jname=None, count=0):
+    if type == 1: strlog = "ERROR: Search title too small - " + name
+    elif type == 2: strlog = "ERROR: Couldn't find - " + name
+    elif type == 3: strlog = "ERROR: Duplicate - " + name + " ---> " + jname
+    else: strlog = str(count) + ": " + name + " ---> " + jname
+
+    with open(logfile, 'a') as f:
+        f.write(strlog + '\n')
+    print(strlog)
+
+def delayCheck():
+    global qtime
+    now = datetime.datetime.now()
+    dtime = now - qtime
+    secs = dtime.total_seconds()
+    diff = math.ceil(delay - secs)
+    #print('TIME DELAY: ' + str(diff))
+    if secs < delay:
+        time.sleep(diff)
+    qtime = datetime.datetime.now()
+
+def optionsCheck(name, jdata):
+    options = []
+    for i in jdata['results']:
+        options.append(str(i['title']).lower())
+    if name.lower() in options:
+        return options.index(name.lower())
+    return False
+
+def jverify(name, jdata):
+    jname = str(jdata['results'][0]['title'])
+    if name.lower() == jname.lower():
+        return jname
+
+    found = optionsCheck(name, jdata)
+    if found != False:
+        return str(jdata['results'][found]['title'])
+
+    print()
+    print('Initial title: ' + name)
+    print('Found title: ' + jname)
+
+    q1 = 'Is this correct? [y/n]: '
+    v1 = input(q1)
+    if v1.strip().lower() == 'n':
+        options = []
+        for i in jdata['results']:
+            options.append(str(i['title']))
+        print()
+        print('Initial title: ' + name)
+        print('[OTHER OPTIONS]')
+        x = 0
+        for o in options:
+            print('[' + str(x) + '] ' + o)
+            if x >= 10:
+                break
+            x = x+1
+        print('[n] None of these')
+
+        q2 = 'Enter number for correct choice (or n if none): '
+        v2 = input(q2)
+        if v2.strip().lower() == 'n': return False
+        elif int(v2) != False: return options[int(v2)]
+        else:
+            print('ERROR: Bad input. Asking again.')
+            v2 = input(q2)
+
+    elif v1.strip().lower() == 'y': return jname
+    else:
+        print('ERROR: Bad input. Asking again.')
+        v1 = input(q1)
+    
+    return False
 
 def main():
-    jikan = Jikan()
-
-    #jfile = jikan.search('anime', '22/7')
-    #jdata = json.loads(json.dumps(jfile))
-    #print(jdata)
-    #print(jdata['results'][0]['mal_id'])
-
+    createLog()
+    data = loadJSON(test1)
+    
     root = ET.Element('myanimelist')
-
-    f = open("export-anime-SomePoorKid.json")
-    #f = open("export-anime-princessdaisy41_2.json")
-
-    data = json.load(f)
-
     info = ET.SubElement(root, 'myinfo')
-    ET.SubElement(info, 'user_id')
     uname = ET.SubElement(info, 'user_name')
-    uetype = ET.SubElement(info, 'user_export_type')
     total = ET.SubElement(info, 'user_total_anime')
-    ET.SubElement(info, 'user_total_watching')
-    ET.SubElement(info, 'user_total_completed')
-    ET.SubElement(info, 'user_total_onhold')
-    ET.SubElement(info, 'user_total_dropped')
-    ET.SubElement(info, 'user_total_plantowatch')
 
     uname.text = data['user']['name']
     total.text = str(len(data['entries']))
-    uetype.text = '1'
-
+    
+    jikan = Jikan()
+    
     count = 0
     store = []
-
+    
     for i in data['entries']:
         count = count + 1
         
@@ -44,27 +125,30 @@ def main():
         name = name.replace('&','and')
         
         if len(i['name']) < 3:
-            print("ERROR: Search title too small - " + i['name'])
-            time.sleep(4)
+            log(1, i['name'])
+            delayCheck()
             continue
         
         try:
             jfile = jikan.search('anime', name)
         except:
-            print("ERROR: Couldn't find - " + i['name'])
-            time.sleep(4)
+            log(2, i['name'])
+            delayCheck()
             continue
         
         jdata = json.loads(json.dumps(jfile))
-        jname = str(jdata['results'][0]['title'])
+        jname = jverify(i['name'], jdata)
+        if jname == False:
+            log(2, i['name'])
+            delayCheck()
+            continue
         
         if jname in store:
-            print("ERROR: Duplicate - " + i['name'] + " ---> " + jname)
-            time.sleep(4)
+            log(3, i['name'], jname)
+            delayCheck()
             continue
         
         store.append(jname)
-        print(str(count) + ": " + i['name'] + " ---> " + jname)
         
         stat = i['status']
         if stat == 'watched': stat = 'Completed'
@@ -77,24 +161,12 @@ def main():
         entry = ET.SubElement(root, 'anime')
         malid = ET.SubElement(entry, 'series_animedb_id')
         title = ET.SubElement(entry, 'series_title')
-        ET.SubElement(entry, 'series_type')
-        ET.SubElement(entry, 'series_episodes')
-        ET.SubElement(entry, 'my_id')
         weps = ET.SubElement(entry, 'my_watched_episodes')
         wsd = ET.SubElement(entry, 'my_start_date')
         wfd = ET.SubElement(entry, 'my_finish_date')
-        ET.SubElement(entry, 'my_rated')
         score = ET.SubElement(entry, 'my_score')
-        ET.SubElement(entry, 'my_dvd')
-        ET.SubElement(entry, 'my_storage')
         status = ET.SubElement(entry, 'my_status')
-        ET.SubElement(entry, 'my_comments')
         twatched = ET.SubElement(entry, 'my_times_watched')
-        ET.SubElement(entry, 'my_rewatch_value')
-        ET.SubElement(entry, 'my_tags')
-        ET.SubElement(entry, 'my_rewatching')
-        ET.SubElement(entry, 'my_rewatching_ep')
-        uoi = ET.SubElement(entry, 'update_on_import')
 
         malid.text = str(jdata['results'][0]['mal_id'])
 
@@ -107,13 +179,15 @@ def main():
         else: wfd.text = str(i['completed']).split()[0]
         score.text = str(int(i['rating']*2))
         twatched.text = str(i['times'])
-        uoi.text = '0'
 
-        if count > 10:
-            break
+        log(0, i['name'], jname, count)
+
+        #Use this for smaller tests
+        #if count >= 10:
+        #    break
 
         #MUST use 4 second delay for Jikan's rate limit
-        time.sleep(4)
+        delayCheck()
 
     tree = ET.ElementTree(root)
     dom = minidom.parseString(ET.tostring(root))
@@ -121,7 +195,6 @@ def main():
     with open('convert.xml', 'w') as f2:
         f2.write(dom)
 
-    f.close()
 
 if __name__ == "__main__":
     main()
