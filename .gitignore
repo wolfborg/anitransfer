@@ -1,1 +1,3 @@
 logs/*
+!logs/.gitkeep
+convert.xml
