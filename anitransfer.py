@@ -81,13 +81,13 @@ def verify1(name, jname, jdata):
         print()
         print('Initial title: ' + name)
         print('[OTHER OPTIONS]')
-        x = 0
+        x = 1
         for o in options:
             print('[' + str(x) + '] ' + o)
-            if x >= 10:
+            if x >= 9:
                 break
             x = x+1
-        print('[n] None of these')
+        print('[0] None of these')
         return verify2(options)
     elif v1.strip().lower() == 'y': return jname
     else:
@@ -96,10 +96,10 @@ def verify1(name, jname, jdata):
     return False
 
 def verify2(options):
-    q2 = 'Enter number for correct choice (or n if none): '
+    q2 = 'Enter number for correct choice: '
     v2 = input(q2)
-    if v2.strip().lower() == 'n': return False
-    elif int(v2) != False and v2 != '0': return options[int(v2)]
+    if v2.strip() == '0': return False
+    elif int(v2) != False: return options[int(v2)-1]
     else:
         print('ERROR: Bad input. Asking again.')
         return verify2(options)
