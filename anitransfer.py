@@ -175,8 +175,8 @@ def main():
             if mal == False:
                 delayCheck()
                 continue
-        else:
-            cached = True
+            else: cache(i['name'], mal[0])
+        else: cached = True
 
         #Convert status
         stat = i['status']
@@ -197,8 +197,12 @@ def main():
         score = ET.SubElement(entry, 'my_score')
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
-        
-        malid.text = mal[0]
+
+        if cached == False:
+            malid.text = mal[0]
+        else:
+            malid.text = mal
+
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
@@ -209,17 +213,13 @@ def main():
         score.text = str(int(i['rating']*2))
         twatched.text = str(i['times'])
 
-        
-        if cached == False:
-            log(0, i['name'], mal[1], count)
-            cache(i['name'], mal[0])
-
         #Use this for smaller tests
         #if count >= 10:
         #    break
 
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
+            log(0, i['name'], mal[1], count)
             delayCheck()
 
     #Export XML to convert file
