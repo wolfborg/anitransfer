@@ -79,11 +79,11 @@ def optionsCheck(name, jdata):
 def jverify(name, jdata):
     jname = str(jdata['results'][0]['title'])
     if name.lower() == jname.lower():
-        return jname
+        return [jname, 0]
 
     found = optionsCheck(name, jdata)
     if found != False:
-        return str(jdata['results'][found]['title'])
+        return [str(jdata['results'][found]['title']), found]
 
     print()
     print('Initial title: ' + name)
@@ -109,7 +109,7 @@ def verify1(name, jname, jdata):
             x = x+1
         print('[0] None of these')
         return verify2(options)
-    elif v1.strip().lower() == 'y': return jname
+    elif v1.strip().lower() == 'y': return [jname, 0]
     else:
         print('ERROR: Bad input. Asking again.')
         return verify1(name, jname, jdata)
@@ -119,7 +119,9 @@ def verify2(options):
     q2 = 'Enter number for correct choice: '
     v2 = input(q2)
     if v2.strip() == '0': return False
-    elif int(v2) != False: return options[int(v2)-1]
+    elif int(v2) != False:
+        #print('option selected: ' + options[int(v2)-1])
+        return [options[int(v2)-1], int(v2)-1]
     else:
         print('ERROR: Bad input. Asking again.')
         return verify2(options)
@@ -142,12 +144,13 @@ def malSearch(name):
         return False
         
     jdata = json.loads(json.dumps(jfile))
-    jname = jverify(name, jdata)
-    if jname == False:
+    jver = jverify(name, jdata)
+    
+    if jver == False:
         log(2, name)
         return False
 
-    return [str(jdata['results'][0]['mal_id']), jname]
+    return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
 
 def main():
     #Make log and load data
