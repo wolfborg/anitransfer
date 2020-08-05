@@ -1,11 +1,12 @@
 from jikanpy import Jikan
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
-import json, time, datetime, math
+import json, time, datetime, math, csv
 
 delay = 4
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
+cachefile = 'cache.csv'
 
 #Anime Planet JSON files
 test1 = "samples/export-anime-SomePoorKid.json"
@@ -36,6 +37,24 @@ def log(type, name, jname=None, count=0):
     with open(logfile, 'a') as f:
         f.write(strlog + '\n')
     print(strlog)
+
+def cache(name, malid):
+    with open(cachefile, 'a', newline='') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow([name, malid])
+
+def cacheSearch(name):
+    with open(cachefile, newline='') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    for i in data:
+        if i[0] == name:
+            mal = i[1]
+            print('Cached ID found: ' + name + ' ---> ' + mal)
+            return mal
+    #print('Cached Not found.')
+    return False
 
 def delayCheck():
     global qtime
@@ -105,6 +124,30 @@ def verify2(options):
         return verify2(options)
     return False
 
+def malSearch(name):
+    #Initiate Jikan
+    jikan = Jikan()
+    
+    if len(name) < 3:
+        log(1, name)
+        return False
+
+    rname = name.replace('&','and')
+    
+    try:
+        jfile = jikan.search('anime', rname)
+    except:
+        log(2, name)
+        return False
+        
+    jdata = json.loads(json.dumps(jfile))
+    jname = jverify(name, jdata)
+    if jname == False:
+        log(2, name)
+        return False
+
+    return [str(jdata['results'][0]['mal_id']), jname]
+
 def main():
     #Make log and load data
     createLog()
@@ -117,44 +160,22 @@ def main():
     total = ET.SubElement(info, 'user_total_anime')
     uname.text = data['user']['name']
     total.text = str(len(data['entries']))
-
-    #Initiate Jikan
-    jikan = Jikan()
     
     count = 0
-    store = []
     
     for i in data['entries']:
+        cached = False
         count = count + 1
         
         name = i['name']
-        name = name.replace('&','and')
-        
-        if len(i['name']) < 3:
-            log(1, i['name'])
-            delayCheck()
-            continue
-        
-        try:
-            jfile = jikan.search('anime', name)
-        except:
-            log(2, i['name'])
-            delayCheck()
-            continue
-        
-        jdata = json.loads(json.dumps(jfile))
-        jname = jverify(i['name'], jdata)
-        if jname == False:
-            log(2, i['name'])
-            delayCheck()
-            continue
-        
-        if jname in store:
-            log(3, i['name'], jname)
-            delayCheck()
-            continue
-        
-        store.append(jname)
+        mal = cacheSearch(name)
+        if mal == False:
+            mal = malSearch(name)
+            if mal == False:
+                delayCheck()
+                continue
+        else:
+            cached = True
 
         #Convert status
         stat = i['status']
@@ -176,10 +197,10 @@ def main():
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
         
+        malid.text = mal[0]
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
-        malid.text = str(jdata['results'][0]['mal_id'])
         if str(i['started']) == "None": wsd.text = "0000-00-00"
         else: wsd.text = str(i['started']).split()[0]
         if str(i['completed']) == "None": wfd.text = "0000-00-00"
@@ -187,14 +208,18 @@ def main():
         score.text = str(int(i['rating']*2))
         twatched.text = str(i['times'])
 
-        log(0, i['name'], jname, count)
+        
+        if cached == False:
+            log(0, i['name'], mal[1], count)
+            cache(i['name'], mal[0])
 
         #Use this for smaller tests
         #if count >= 10:
         #    break
 
         #MUST use 4 second delay for Jikan's rate limit
-        delayCheck()
+        if cached == False:
+            delayCheck()
 
     #Export XML to convert file
     tree = ET.ElementTree(root)
