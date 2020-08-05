@@ -85,8 +85,6 @@ def jverify(name, jdata):
     if found != False:
         return [str(jdata['results'][found]['title']), found]
 
-    print()
-    print('Initial title: ' + name)
     print('Found title: ' + jname)
 
     return verify1(name, jname, jdata)
@@ -128,6 +126,9 @@ def verify2(options):
     return False
 
 def malSearch(name):
+    print()
+    print('Initial title: ' + name)
+    
     #Initiate Jikan
     jikan = Jikan()
     
