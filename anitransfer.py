@@ -69,6 +69,9 @@ def jverify(name, jdata):
     print('Initial title: ' + name)
     print('Found title: ' + jname)
 
+    return verify1(name, jname, jdata)
+
+def verify1(name, jname, jdata):
     q1 = 'Is this correct? [y/n]: '
     v1 = input(q1)
     if v1.strip().lower() == 'n':
@@ -85,20 +88,21 @@ def jverify(name, jdata):
                 break
             x = x+1
         print('[n] None of these')
-
-        q2 = 'Enter number for correct choice (or n if none): '
-        v2 = input(q2)
-        if v2.strip().lower() == 'n': return False
-        elif int(v2) != False: return options[int(v2)]
-        else:
-            print('ERROR: Bad input. Asking again.')
-            v2 = input(q2)
-
+        return verify2(options)
     elif v1.strip().lower() == 'y': return jname
     else:
         print('ERROR: Bad input. Asking again.')
-        v1 = input(q1)
-    
+        return verify1(name, jname, jdata)
+    return False
+
+def verify2(options):
+    q2 = 'Enter number for correct choice (or n if none): '
+    v2 = input(q2)
+    if v2.strip().lower() == 'n': return False
+    elif int(v2) != False and v2 != '0': return options[int(v2)]
+    else:
+        print('ERROR: Bad input. Asking again.')
+        return verify2(options)
     return False
 
 def main():
