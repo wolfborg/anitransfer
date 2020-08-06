@@ -7,10 +7,12 @@ delay = 4
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
 cachefile = 'cache.csv'
+badfile = 'bad.csv'
 
 #Anime Planet JSON files
 test1 = "samples/export-anime-SomePoorKid.json"
 test2 = "samples/export-anime-princessdaisy41_2.json"
+file = test2
 
 #Loads JSON file
 def loadJSON(filename):
@@ -55,6 +57,17 @@ def cacheSearch(name):
             print('Cached ID found: ' + name + ' ---> ' + mal)
             return mal
     #print('Cached Not found.')
+    return False
+
+def badSearch(name):
+    with open(badfile, newline='') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    for i in data:
+        if i[0] == name:
+            print('Bad title found: ' + name + ' ---> ERROR')
+            return True
     return False
 
 def delayCheck():
@@ -156,7 +169,7 @@ def malSearch(name):
 def main():
     #Make log and load data
     createLog()
-    data = loadJSON(test1)
+    data = loadJSON(file)
 
     #Start XML structure
     root = ET.Element('myanimelist')
@@ -173,6 +186,10 @@ def main():
         count = count + 1
         
         name = i['name']
+        if badSearch(name):
+            log(2, name)
+            continue
+        
         mal = cacheSearch(name)
         if mal == False:
             mal = malSearch(name)
