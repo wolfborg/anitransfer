@@ -12,7 +12,8 @@ badfile = 'bad.csv'
 #Anime Planet JSON files
 test1 = "samples/export-anime-SomePoorKid.json"
 test2 = "samples/export-anime-princessdaisy41_2.json"
-file = test2
+test3 = "samples/export-anime-aztech101.json"
+file = test1
 
 #Loads JSON file
 def loadJSON(filename):
@@ -232,7 +233,8 @@ def main():
         if str(i['completed']) == "None": wfd.text = "0000-00-00"
         else: wfd.text = str(i['completed']).split()[0]
         score.text = str(int(i['rating']*2))
-        twatched.text = str(i['times'])
+        if (i['times'] > 1): twatched.text = str(i['times'])
+        else: twatched.text = "0"
 
         #Use this for smaller tests
         #if count >= 10:
