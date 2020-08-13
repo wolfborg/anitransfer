@@ -233,7 +233,7 @@ def main():
         if str(i['completed']) == "None": wfd.text = "0000-00-00"
         else: wfd.text = str(i['completed']).split()[0]
         score.text = str(int(i['rating']*2))
-        if (i['times'] > 1): twatched.text = str(i['times'])
+        if (i['times'] > 1): twatched.text = str(i['times']-1)
         else: twatched.text = "0"
 
         #Use this for smaller tests
