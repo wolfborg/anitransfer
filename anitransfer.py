@@ -13,6 +13,7 @@ badfile = 'bad.csv'
 test1 = "samples/export-anime-SomePoorKid.json"
 test2 = "samples/export-anime-princessdaisy41_2.json"
 test3 = "samples/export-anime-aztech101.json"
+test4 = "samples/export-anime-crandor94.json"
 file = test1
 
 #Loads JSON file
