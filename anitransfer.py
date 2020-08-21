@@ -39,17 +39,17 @@ def log(type, name, jname=None, count=0):
     else: strlog = str(count) + ": " + name + " ---> " + jname
 
     if type == 1 or type == 2 or type == 3:
-        with open(logfile, 'a') as f:
+        with open(logfile, 'a', encoding='utf-8') as f:
             f.write(strlog + '\n')
     print(strlog)
 
 def cache(name, malid):
-    with open(cachefile, 'a', newline='') as f:
+    with open(cachefile, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name, malid])
 
 def cacheSearch(name):
-    with open(cachefile, newline='') as f:
+    with open(cachefile, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -62,7 +62,7 @@ def cacheSearch(name):
     return False
 
 def badSearch(name):
-    with open(badfile, newline='') as f:
+    with open(badfile, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -250,7 +250,7 @@ def main():
     tree = ET.ElementTree(root)
     dom = minidom.parseString(ET.tostring(root))
     dom = dom.toprettyxml(indent='\t')
-    with open('convert.xml', 'w') as f2:
+    with open('convert.xml', 'w', encoding='utf-8') as f2:
         f2.write(dom)
 
 
