@@ -14,11 +14,11 @@ from jikanpy import Jikan
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
+    'cache_file': 'cache.csv',
 }
 
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
-cachefile = 'cache.csv'
 badfile = 'bad.csv'
 
 #Anime Planet JSON files
@@ -55,13 +55,13 @@ def log(type, name, jname=None, count=0):
             f.write(strlog + '\n')
     print(strlog)
 
-def cache(name, malid):
-    with open(cachefile, 'a', newline='', encoding='utf-8') as f:
+def cache(name, malid, cache_file):
+    with open(cache_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name, malid])
 
-def cacheSearch(name):
-    with open(cachefile, newline='', encoding='utf-8') as f:
+def cacheSearch(name, cache_file):
+    with open(cache_file, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -192,6 +192,11 @@ def parse_arguments():
         default=DEFAULTS['jikan_delay'],
         type=int
     )
+    parser.add_argument(
+        '--cache-file',
+        help='Cache file to use for already downloaded anime mappings',
+        default=DEFAULTS['cache_file']
+    )
 
     options = parser.parse_args()
     return options
@@ -221,13 +226,13 @@ def main():
             log(2, name)
             continue
 
-        mal = cacheSearch(name)
+        mal = cacheSearch(name, options.cache_file)
         if mal == False:
             mal = malSearch(name)
             if mal == False:
                 delayCheck(options.jikan_delay)
                 continue
-            else: cache(i['name'], mal[0])
+            else: cache(i['name'], mal[0], options.cache_file)
         else: cached = True
 
         #Convert status
