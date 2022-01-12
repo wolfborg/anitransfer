@@ -14,11 +14,11 @@ from jikanpy import Jikan
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
+    'log_file': f'logs/log_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
 }
 
-logfile = 'log.txt'
 qtime = datetime.datetime.now()
 
 #Loads JSON file
@@ -29,10 +29,7 @@ def loadJSON(filename):
     return data
 
 #Creates log text file with datetime as name
-def createLog():
-    global logfile
-    dtime = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    logfile = 'logs/log_' + dtime + '.txt'
+def createLog(logfile):
     f = open(logfile, 'w')
     f.close()
 
@@ -186,6 +183,11 @@ def parse_arguments():
         type=int
     )
     parser.add_argument(
+        '--log-file',
+        help='Write log of operations to this file',
+        default=DEFAULTS['log_file']
+    )
+    parser.add_argument(
         '--cache-file',
         help='Cache file to use for already downloaded anime mappings',
         default=DEFAULTS['cache_file']
@@ -203,7 +205,7 @@ def parse_arguments():
 def main():
     #Make log and load data
     options = parse_arguments()
-    createLog()
+    createLog(options.log_file)
     data = loadJSON(options.anime_list)
 
     #Start XML structure
