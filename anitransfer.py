@@ -189,7 +189,8 @@ def parse_arguments():
     parser.add_argument(
         '--jikan-delay',
         help='Delay between API requests to Jikan in seconds',
-        default=DEFAULTS['jikan_delay']
+        default=DEFAULTS['jikan_delay'],
+        type=int
     )
 
     options = parser.parse_args()
