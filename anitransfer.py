@@ -3,6 +3,7 @@
 
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
+import argparse
 import csv
 import datetime
 import json
@@ -11,7 +12,10 @@ import time
 
 from jikanpy import Jikan
 
-delay = 4
+DEFAULTS = {
+    'jikan_delay': 4, # in seconds
+}
+
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
 cachefile = 'cache.csv'
@@ -80,7 +84,7 @@ def badSearch(name):
             return True
     return False
 
-def delayCheck():
+def delayCheck(delay):
     global qtime
     now = datetime.datetime.now()
     dtime = now - qtime
@@ -176,8 +180,24 @@ def malSearch(name):
 
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
 
+def parse_arguments():
+    """Parse given command line arguments."""
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        '--jikan-delay',
+        help='Delay between API requests to Jikan in seconds',
+        default=DEFAULTS['jikan_delay']
+    )
+
+    options = parser.parse_args()
+    return options
+
 def main():
     #Make log and load data
+    options = parse_arguments()
     createLog()
     data = loadJSON(file)
 
@@ -204,7 +224,7 @@ def main():
         if mal == False:
             mal = malSearch(name)
             if mal == False:
-                delayCheck()
+                delayCheck(options.jikan_delay)
                 continue
             else: cache(i['name'], mal[0])
         else: cached = True
