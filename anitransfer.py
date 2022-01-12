@@ -143,25 +143,25 @@ def verify2(options):
 def malSearch(name):
     print()
     print('Initial title: ' + name)
-    
+
     #Initiate Jikan
     jikan = Jikan()
-    
+
     if len(name) < 3:
         log(1, name)
         return False
 
     rname = name.replace('&','and')
-    
+
     try:
         jfile = jikan.search('anime', rname)
     except:
         log(2, name)
         return False
-        
+
     jdata = json.loads(json.dumps(jfile))
     jver = jverify(name, jdata)
-    
+
     if jver == False:
         log(2, name)
         return False
@@ -180,18 +180,18 @@ def main():
     total = ET.SubElement(info, 'user_total_anime')
     uname.text = data['user']['name']
     total.text = str(len(data['entries']))
-    
+
     count = 0
-    
+
     for i in data['entries']:
         cached = False
         count = count + 1
-        
+
         name = i['name']
         if badSearch(name):
             log(2, name)
             continue
-        
+
         mal = cacheSearch(name)
         if mal == False:
             mal = malSearch(name)
