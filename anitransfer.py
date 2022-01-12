@@ -21,13 +21,6 @@ DEFAULTS = {
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
 
-#Anime Planet JSON files
-test1 = "samples/export-anime-SomePoorKid.json"
-test2 = "samples/export-anime-princessdaisy41_2.json"
-test3 = "samples/export-anime-aztech101.json"
-test4 = "samples/export-anime-crandor94.json"
-file = test1
-
 #Loads JSON file
 def loadJSON(filename):
     f = open(filename)
@@ -202,6 +195,7 @@ def parse_arguments():
         help='Cache file to use for incompatible anime mappings',
         default=DEFAULTS['bad_file']
     )
+    parser.add_argument('anime_list')
 
     options = parser.parse_args()
     return options
@@ -210,7 +204,7 @@ def main():
     #Make log and load data
     options = parse_arguments()
     createLog()
-    data = loadJSON(file)
+    data = loadJSON(options.anime_list)
 
     #Start XML structure
     root = ET.Element('myanimelist')
