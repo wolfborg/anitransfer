@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Convert an anime-planet.com export to MyAnimeList XML format."""
+
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 import csv
