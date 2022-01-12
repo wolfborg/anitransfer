@@ -1,7 +1,12 @@
-from jikanpy import Jikan
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
-import json, time, datetime, math, csv
+import csv
+import datetime
+import json
+import math
+import time
+
+from jikanpy import Jikan
 
 delay = 4
 logfile = 'log.txt'
