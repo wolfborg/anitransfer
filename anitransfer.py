@@ -279,7 +279,7 @@ def main():
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
             log(0, i['name'], mal[1], count)
-            delayCheck()
+            delayCheck(options.jikan_delay)
 
     #Export XML to convert file
     tree = ET.ElementTree(root)
