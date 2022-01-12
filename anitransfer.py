@@ -15,11 +15,11 @@ from jikanpy import Jikan
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
     'cache_file': 'cache.csv',
+    'bad_file': 'bad.csv',
 }
 
 logfile = 'log.txt'
 qtime = datetime.datetime.now()
-badfile = 'bad.csv'
 
 #Anime Planet JSON files
 test1 = "samples/export-anime-SomePoorKid.json"
@@ -73,8 +73,8 @@ def cacheSearch(name, cache_file):
     #print('Cached Not found.')
     return False
 
-def badSearch(name):
-    with open(badfile, newline='', encoding='utf-8') as f:
+def badSearch(name, bad_file):
+    with open(bad_file, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -197,6 +197,11 @@ def parse_arguments():
         help='Cache file to use for already downloaded anime mappings',
         default=DEFAULTS['cache_file']
     )
+    parser.add_argument(
+        '--bad-file',
+        help='Cache file to use for incompatible anime mappings',
+        default=DEFAULTS['bad_file']
+    )
 
     options = parser.parse_args()
     return options
@@ -222,7 +227,7 @@ def main():
         count = count + 1
 
         name = i['name']
-        if badSearch(name):
+        if badSearch(name, options.bad_file):
             log(2, name)
             continue
 
