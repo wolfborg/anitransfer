@@ -17,7 +17,7 @@ poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
 ```
 
 If you would like to see a full list of available options, run 
-`poetry run antransfer.py --help`.
+`poetry run anitransfer.py --help`.
 
 [poetry]: https://python-poetry.org
 
