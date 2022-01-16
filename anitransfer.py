@@ -36,7 +36,7 @@ def createLog(logfile):
     f.close()
 
 #Prints logs and errors and appends to log file
-def log(type, name, jname=None, count=0):
+def log(type, name, logfile, jname=None, count=0):
     if type == 1: strlog = "ERROR: Search title too small - " + name
     elif type == 2: strlog = "ERROR: Couldn't find - " + name
     elif type == 3: strlog = "ERROR: Duplicate - " + name + " ---> " + jname
@@ -148,7 +148,7 @@ def verify2(options):
         return verify2(options)
     return False
 
-def malSearch(name):
+def malSearch(name, logfile):
     print()
     print('Initial title: ' + name)
 
@@ -156,7 +156,7 @@ def malSearch(name):
     jikan = Jikan()
 
     if len(name) < 3:
-        log(1, name)
+        log(1, name, logfile)
         return False
 
     rname = name.replace('&','and')
@@ -164,14 +164,14 @@ def malSearch(name):
     try:
         jfile = jikan.search('anime', rname)
     except:
-        log(2, name)
+        log(2, name, logfile)
         return False
 
     jdata = json.loads(json.dumps(jfile))
     jver = jverify(name, jdata)
 
     if jver == False:
-        log(2, name)
+        log(2, name, logfile)
         return False
 
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
