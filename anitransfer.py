@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Convert an anime-planet.com export to MyAnimeList XML format."""
 
+from typing import Any, Dict
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
 import argparse
@@ -26,17 +27,11 @@ DEFAULTS = {
 
 qtime = datetime.datetime.now()
 
-#Loads JSON file
-def loadJSON(filename):
-    f = open(filename)
-    data = json.load(f)
-    f.close()
-    return data
-
-#Creates log text file with datetime as name
-def createLog(logfile):
-    f = open(logfile, 'w')
-    f.close()
+def load_export(filename: str) -> Dict[str, Dict[Any, Any]]:
+    """Import the JSON file exported from anime-planet.com."""
+    with open(filename, encoding='utf-8', mode='r') as source_file:
+        content: Dict[str, Dict[Any, Any]] = json.load(source_file)
+    return content
 
 #Prints logs and errors and appends to log file
 def log(type, name, jname=None, count=0):
@@ -288,7 +283,7 @@ def main() -> None:
     # Make log and load data
     options = parse_arguments()
     createLog(options.log_file)
-    data = loadJSON(options.anime_list)
+    data = load_export(options.anime_list)
 
     statistics = {
         'assigned': 0, # amount of new entries that were assigned using Jikan
