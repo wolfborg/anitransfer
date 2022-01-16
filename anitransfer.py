@@ -225,8 +225,8 @@ def parse_arguments():
     options = parser.parse_args()
     return options
 
-def main():
-    #Make log and load data
+def main() -> None:
+    # Make log and load data
     options = parse_arguments()
     createLog(options.log_file)
     data = loadJSON(options.anime_list)
