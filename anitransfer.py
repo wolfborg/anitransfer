@@ -18,6 +18,7 @@ DEFAULTS = {
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
     'skip_confirm': False,
+    'limit': -1,
 }
 
 qtime = datetime.datetime.now()
@@ -213,6 +214,12 @@ def parse_arguments():
         default=DEFAULTS['skip_confirm'],
         action='store_true'
     )
+    parser.add_argument(
+        '--limit',
+        help='Limits the number of entries to process',
+        default=DEFAULTS['limit'],
+        type=int
+    )
     parser.add_argument('anime_list')
 
     options = parser.parse_args()
@@ -221,7 +228,6 @@ def parse_arguments():
 def main():
     #Make log and load data
     options = parse_arguments()
-    print(options.skip_confirm)
     createLog(options.log_file)
     data = loadJSON(options.anime_list)
 
@@ -236,6 +242,12 @@ def main():
     count = 0
 
     for i in data['entries']:
+        #Use this for smaller tests
+        limit = options.limit
+        if limit > -1:
+            if count >= limit:
+                break
+
         cached = False
         count = count + 1
 
@@ -288,10 +300,6 @@ def main():
         score.text = str(int(i['rating']*2))
         if (i['times'] > 1): twatched.text = str(i['times']-1)
         else: twatched.text = "0"
-
-        #Use this for smaller tests
-        #if count >= 10:
-        #    break
 
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
