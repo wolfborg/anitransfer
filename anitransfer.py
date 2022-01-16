@@ -39,10 +39,9 @@ def log(type, name, jname=None, count=0):
 
     if type == 1: strlog = "ERROR: Search title too small - " + name
     elif type == 2: strlog = "ERROR: Couldn't find - " + name
-    elif type == 3: strlog = "ERROR: Duplicate - " + name + " ---> " + jname
     else: strlog = str(count) + ": " + name + " ---> " + jname
 
-    if type == 1 or type == 2 or type == 3:
+    if type == 1 or type == 2:
         with open(logfile, 'a', encoding='utf-8') as f:
             f.write(strlog + '\n')
     print(strlog)
