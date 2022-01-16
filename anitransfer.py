@@ -265,7 +265,6 @@ def prepare_logging(log_level: str, log_file: str) -> logging.Logger:
 
 def print_summary(statistics: Dict[str,int]) -> None:
     """Print a usage summary at the end of a run."""
-
     formatted = f"""Summary:
     Processed {statistics['processed']} entries.
     Excluded {statistics['blacklisted']} entries based on blacklist.
