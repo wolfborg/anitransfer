@@ -6,15 +6,18 @@ import xml.etree.cElementTree as ET
 import argparse
 import csv
 import datetime
+import logging
 import json
 import math
 import time
+import sys
 
 from jikanpy import Jikan
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
     'log_file': f'logs/log_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
+    'log_level': 'WARNING',
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
     'skip_confirm': False,
@@ -220,10 +223,51 @@ def parse_arguments() -> argparse.Namespace:
         default=DEFAULTS['limit'],
         type=int
     )
+    parser.add_argument(
+        '--log-level',
+        help='Level of detail to use in log output',
+        default=DEFAULTS['log_level'],
+        choices=[
+            'CRITICAL',
+            'ERROR',
+            'WARNING',
+            'INFO',
+            'DEBUG',
+        ]
+    )
     parser.add_argument('anime_list')
 
     options = parser.parse_args()
     return options
+
+def prepare_logging(log_level: str, log_file: str) -> logging.Logger:
+    """Set up logging configuration."""
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # stderr output
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    stream_handler = logging.StreamHandler(stream=sys.stderr)
+    stream_handler.setFormatter(formatter)
+    stream_handler.setLevel(log_level)
+    logger.addHandler(stream_handler)
+
+    # file output
+    # this is https://en.wikipedia.org/wiki/ISO_8601
+    formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s: %(funcName)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+    )
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+    logger.addHandler(file_handler)
+
+    logging.info('Logging enabled.')
+    logging.debug('Debug logging enabled.')
+
+    return logger
+
 
 def print_summary(statistics: Dict[str,int]) -> None:
     """Print a usage summary at the end of a run."""
