@@ -1,21 +1,27 @@
-from jikanpy import Jikan
+#!/usr/bin/env python3
+"""Convert an anime-planet.com export to MyAnimeList XML format."""
+
 from xml.dom import minidom
 import xml.etree.cElementTree as ET
-import json, time, datetime, math, csv
+import argparse
+import csv
+import datetime
+import json
+import math
+import time
 
-delay = 4
-logfile = 'log.txt'
-qtime = datetime.datetime.now()
-cachefile = 'cache.csv'
-badfile = 'bad.csv'
+from jikanpy import Jikan
+
 skip = False
 
-#Anime Planet JSON files
-test1 = "samples/export-anime-SomePoorKid.json"
-test2 = "samples/export-anime-princessdaisy41_2.json"
-test3 = "samples/export-anime-aztech101.json"
-test4 = "samples/export-anime-crandor94.json"
-file = test1
+DEFAULTS = {
+    'jikan_delay': 4, # in seconds
+    'log_file': f'logs/log_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
+    'cache_file': 'cache.csv',
+    'bad_file': 'bad.csv',
+}
+
+qtime = datetime.datetime.now()
 
 #Loads JSON file
 def loadJSON(filename):
@@ -25,10 +31,7 @@ def loadJSON(filename):
     return data
 
 #Creates log text file with datetime as name
-def createLog():
-    global logfile
-    dtime = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
-    logfile = 'logs/log_' + dtime + '.txt'
+def createLog(logfile):
     f = open(logfile, 'w')
     f.close()
 
@@ -44,13 +47,13 @@ def log(type, name, jname=None, count=0):
             f.write(strlog + '\n')
     print(strlog)
 
-def cache(name, malid):
-    with open(cachefile, 'a', newline='', encoding='utf-8') as f:
+def cache(name, malid, cache_file):
+    with open(cache_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name, malid])
 
-def cacheSearch(name):
-    with open(cachefile, newline='', encoding='utf-8') as f:
+def cacheSearch(name, cache_file):
+    with open(cache_file, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -62,8 +65,8 @@ def cacheSearch(name):
     #print('Cached Not found.')
     return False
 
-def badSearch(name):
-    with open(badfile, newline='', encoding='utf-8') as f:
+def badSearch(name, bad_file):
+    with open(bad_file, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
         data = list(reader)
 
@@ -73,7 +76,7 @@ def badSearch(name):
             return True
     return False
 
-def delayCheck():
+def delayCheck(delay):
     global qtime
     now = datetime.datetime.now()
     dtime = now - qtime
@@ -148,35 +151,68 @@ def verify2(options):
 def malSearch(name):
     print()
     print('Initial title: ' + name)
-    
+
     #Initiate Jikan
     jikan = Jikan()
-    
+
     if len(name) < 3:
         log(1, name)
         return False
 
     rname = name.replace('&','and')
-    
+
     try:
         jfile = jikan.search('anime', rname)
     except:
         log(2, name)
         return False
-        
+
     jdata = json.loads(json.dumps(jfile))
     jver = jverify(name, jdata)
-    
+
     if jver == False:
         log(2, name)
         return False
 
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
 
+def parse_arguments():
+    """Parse given command line arguments."""
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        '--jikan-delay',
+        help='Delay between API requests to Jikan in seconds',
+        default=DEFAULTS['jikan_delay'],
+        type=int
+    )
+    parser.add_argument(
+        '--log-file',
+        help='Write log of operations to this file',
+        default=DEFAULTS['log_file']
+    )
+    parser.add_argument(
+        '--cache-file',
+        help='Cache file to use for already downloaded anime mappings',
+        default=DEFAULTS['cache_file']
+    )
+    parser.add_argument(
+        '--bad-file',
+        help='Cache file to use for incompatible anime mappings',
+        default=DEFAULTS['bad_file']
+    )
+    parser.add_argument('anime_list')
+
+    options = parser.parse_args()
+    return options
+
 def main():
     #Make log and load data
-    createLog()
-    data = loadJSON(file)
+    options = parse_arguments()
+    createLog(options.log_file)
+    data = loadJSON(options.anime_list)
 
     #Start XML structure
     root = ET.Element('myanimelist')
@@ -185,25 +221,25 @@ def main():
     total = ET.SubElement(info, 'user_total_anime')
     uname.text = data['user']['name']
     total.text = str(len(data['entries']))
-    
+
     count = 0
-    
+
     for i in data['entries']:
         cached = False
         count = count + 1
-        
+
         name = i['name']
-        if badSearch(name):
+        if badSearch(name, options.bad_file):
             log(2, name)
             continue
-        
-        mal = cacheSearch(name)
+
+        mal = cacheSearch(name, options.cache_file)
         if mal == False:
             mal = malSearch(name)
             if mal == False:
-                delayCheck()
+                delayCheck(options.jikan_delay)
                 continue
-            else: cache(i['name'], mal[0])
+            else: cache(i['name'], mal[0], options.cache_file)
         else: cached = True
 
         #Convert status
@@ -249,7 +285,7 @@ def main():
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
             log(0, i['name'], mal[1], count)
-            delayCheck()
+            delayCheck(options.jikan_delay)
 
     #Export XML to convert file
     tree = ET.ElementTree(root)

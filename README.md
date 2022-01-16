@@ -1,4 +1,27 @@
 # anitransfer
+## usage
+This requires [poetry][] on your machine for easier management of Python projects.
+
+Install dependencies in a virtual environment. This is required only once.
+
+```bash
+poetry install
+```
+
+Run the conversion.
+```bash
+poetry run anitransfer.py path/to/your/file.json
+
+# example
+poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
+```
+
+If you would like to see a full list of available options, run 
+`poetry run anitransfer.py --help`.
+
+[poetry]: https://python-poetry.org
+
+## history
 The goal of this script is to move your anime list from Anime Planet to AniList.
 
 The complication with this is that Anime Planet gives you a JSON file while AniList lets you import from a MyAnimeList XML export file. Taking the information from the JSON and putting it into the same XML structure is easy enough, but the AniList import process is dependent on the MyAnimeList ID number. This means we need to find the anime on MyAnimeList and connect the ID with our data from Anime Planet to bring it all into AniList. To do this, this script uses the unofficial MyAnimeList API, Jikan to search for the ID.
