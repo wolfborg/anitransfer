@@ -6,7 +6,7 @@ authors = ["Derek Chaplin <chaplin.derek@gmail.com>, Alexander Skiba <ghostlyric
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 jikanpy = "^4.3.2"
 
 [tool.poetry.dev-dependencies]
