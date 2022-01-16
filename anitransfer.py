@@ -12,6 +12,8 @@ import time
 
 from jikanpy import Jikan
 
+skip = False
+
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
     'log_file': f'logs/log_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
@@ -108,6 +110,10 @@ def jverify(name, jdata):
 
 def verify1(name, jname, jdata):
     q1 = 'Is this correct? [y/n]: '
+    global skip
+    if skip:
+        print(q1 + 'SKIP')
+        return False
     v1 = input(q1)
     if v1.strip().lower() == 'n':
         options = []
