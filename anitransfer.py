@@ -225,11 +225,34 @@ def parse_arguments():
     options = parser.parse_args()
     return options
 
+def print_summary(statistics: Dict[str,int]) -> None:
+    """Print a usage summary at the end of a run."""
+
+    formatted = f"""Summary:
+    Processed {statistics['processed']} entries.
+    Excluded {statistics['blacklisted']} entries based on blacklist.
+    Found {statistics['cached']} entries using local cache.
+    Used {statistics['requests']} requests to Jikan to assign {statistics['assigned']} titles."""
+
+    print(formatted)
+
+def increment(statistics: Dict[str,int], value: str) -> None:
+    """Add an entry to the relevant key of the usage statistics."""
+    statistics.update({value: statistics[value] + 1})
+
 def main() -> None:
     # Make log and load data
     options = parse_arguments()
     createLog(options.log_file)
     data = loadJSON(options.anime_list)
+
+    statistics = {
+        'assigned': 0, # amount of new entries that were assigned using Jikan
+        'blacklisted': 0, # amount of entries that match a blacklist entry
+        'cached': 0, # amount of entries that match a cache entry
+        'processed': 0, # amount of total entries processed
+        'requests': 0, # amount of total API requests to Jikan
+    }
 
     #Start XML structure
     root = ET.Element('myanimelist')
@@ -263,7 +286,9 @@ def main() -> None:
                 delayCheck(options.jikan_delay)
                 continue
             else: cache(i['name'], mal[0], options.cache_file)
-        else: cached = True
+        else:
+            cached = True
+            increment(statistics, 'cached')
 
         #Convert status
         stat = i['status']
@@ -313,6 +338,7 @@ def main() -> None:
     with open('convert.xml', 'w', encoding='utf-8') as f2:
         f2.write(dom)
 
+    print_summary(statistics)
 
 if __name__ == "__main__":
     main()
