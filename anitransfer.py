@@ -181,7 +181,7 @@ def malSearch(name):
 
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Parse given command line arguments."""
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
