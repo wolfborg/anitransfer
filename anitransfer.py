@@ -36,7 +36,9 @@ def createLog(logfile):
     f.close()
 
 #Prints logs and errors and appends to log file
-def log(type, name, logfile, jname=None, count=0):
+def log(type, name, jname=None, count=0):
+    logfile = parse_arguments().log_file
+
     if type == 1: strlog = "ERROR: Search title too small - " + name
     elif type == 2: strlog = "ERROR: Couldn't find - " + name
     elif type == 3: strlog = "ERROR: Duplicate - " + name + " ---> " + jname
@@ -148,7 +150,7 @@ def verify2(options):
         return verify2(options)
     return False
 
-def malSearch(name, logfile):
+def malSearch(name):
     print()
     print('Initial title: ' + name)
 
@@ -156,7 +158,7 @@ def malSearch(name, logfile):
     jikan = Jikan()
 
     if len(name) < 3:
-        log(1, name, logfile)
+        log(1, name)
         return False
 
     rname = name.replace('&','and')
@@ -164,14 +166,14 @@ def malSearch(name, logfile):
     try:
         jfile = jikan.search('anime', rname)
     except:
-        log(2, name, logfile)
+        log(2, name)
         return False
 
     jdata = json.loads(json.dumps(jfile))
     jver = jverify(name, jdata)
 
     if jver == False:
-        log(2, name, logfile)
+        log(2, name)
         return False
 
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
@@ -279,8 +281,6 @@ def main():
         else: twatched.text = "0"
 
         #Use this for smaller tests
-        #if count >= 10:
-        #    break
 
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
