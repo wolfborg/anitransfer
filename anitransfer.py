@@ -8,6 +8,7 @@ logfile = 'log.txt'
 qtime = datetime.datetime.now()
 cachefile = 'cache.csv'
 badfile = 'bad.csv'
+skip = False
 
 #Anime Planet JSON files
 test1 = "samples/export-anime-SomePoorKid.json"
@@ -106,6 +107,10 @@ def jverify(name, jdata):
 
 def verify1(name, jname, jdata):
     q1 = 'Is this correct? [y/n]: '
+    global skip
+    if skip:
+        print(q1 + 'SKIP')
+        return False
     v1 = input(q1)
     if v1.strip().lower() == 'n':
         options = []
