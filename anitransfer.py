@@ -176,6 +176,7 @@ def malSearch(name):
         log(2, name)
         return False
 
+    increment(statistics, 'assigned')
     return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
 
 def parse_arguments() -> argparse.Namespace:
