@@ -164,6 +164,7 @@ def malSearch(name):
     rname = name.replace('&','and')
 
     try:
+        increment(statistics, 'requests')
         jfile = jikan.search('anime', rname)
     except:
         log(2, name)
