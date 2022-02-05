@@ -8,8 +8,12 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.8"
 jikanpy = "^4.3.2"
+rich = "^11.0.0"
+appdirs = "^1.4.4"
+python-dateutil = "^2.8.2"
 
 [tool.poetry.dev-dependencies]
+black = "^22.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
