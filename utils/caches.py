@@ -71,6 +71,7 @@ class JikanResultCache:
         return entry
 
     def _verify_type_is_supported(self, item_type: str) -> None:
+        """Ensure the used cache is implemented."""
         if item_type not in self._supported_types:
             raise ValueError(
                 f"JikanResultCache does not implement cache of type {item_type}."
@@ -78,6 +79,11 @@ class JikanResultCache:
 
 
 def _calculate_cache_key(item: str) -> str:
+    """Return the cache key for an item.
+
+    Strings are hashed.
+    Integers are returned as is.
+    """
     try:
         key = hashlib.sha256(item.encode()).hexdigest()
     except AttributeError:
