@@ -11,6 +11,7 @@ jikanpy = "^4.3.2"
 rich = "^11.0.0"
 appdirs = "^1.4.4"
 python-dateutil = "^2.8.2"
+defusedxml = "^0.7.1"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
