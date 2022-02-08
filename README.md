@@ -10,14 +10,14 @@ poetry install
 
 Run the conversion.
 ```bash
-poetry run anitransfer.py path/to/your/file.json
+poetry run python anitransfer.py path/to/your/file.json
 
 # example
-poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
+poetry run python anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
 ```
 
 If you would like to see a full list of available options, run 
-`poetry run anitransfer.py --help`.
+`poetry run python anitransfer.py --help`.
 
 [poetry]: https://python-poetry.org
 
