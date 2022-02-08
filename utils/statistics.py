@@ -26,6 +26,7 @@ class Statistics:
             "jikan_requests_total": 0,
             "jikan_requests_cached": 0,
             "jikan_requests_failed": 0,
+            "time_spent_waiting": 0,
         }
 
     def increment(self, name: str, amount: int = 1) -> None:
@@ -42,7 +43,11 @@ class Statistics:
 
         table.add_row("Entries", "processed", str(self.counters["entries_processed"]))
         table.add_row("Entries", "unmatched", str(self.counters["entries_unmatched"]))
-        table.add_row("Entries", "dropped due to unsupported status", str(self.counters["entries_unsupported"]))
+        table.add_row(
+            "Entries",
+            "dropped due to unsupported status",
+            str(self.counters["entries_unsupported"]),
+        )
         table.add_row(
             "Matches",
             "matched via Jikan",
@@ -73,6 +78,9 @@ class Statistics:
         )
         table.add_row(
             "Requests", "requests failed", str(self.counters["jikan_requests_failed"])
+        )
+        table.add_row(
+            "Time", "spent waiting (seconds)", str(self.counters["time_spent_waiting"])
         )
 
         console = Console()
