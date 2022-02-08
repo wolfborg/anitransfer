@@ -4,7 +4,7 @@
 import json
 import math
 import time
-from typing import Dict, Union, Optional
+from typing import Dict, Union
 
 # internal imports
 from utils.statistics import Statistics
@@ -28,13 +28,12 @@ class JikanDelay:
             cls.time = time.monotonic()
         return cls._instance
 
-    def check(self, delay: int, statistics: Optional[Statistics] = None) -> None:
+    def check(self, delay: int) -> None:
         """Ensure the delay between API requests of Jikan is enforced."""
         now = time.monotonic()
         delta = math.floor(now - self.time)
         diff = delay - delta
         if delta < delay:
             time.sleep(diff)
-            if statistics:
-                statistics.increment("time_spent_waiting", diff)
+            Statistics().increment("time_spent_waiting", diff)
         self.time = time.monotonic()

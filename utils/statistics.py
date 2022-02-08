@@ -11,23 +11,28 @@ from rich.table import Table
 class Statistics:
     """Hold statistics about the current anitransfer run."""
 
+    _instance = None
     counters = {}  # type: Dict[str, int]
 
-    def __init__(self) -> None:
-        """Create a new Statistics instance."""
-        self.counters = {
-            "entries_processed": 0,
-            "entries_matched_manually": 0,
-            "entries_matched_using_jikan": 0,
-            "entries_matched_using_cache": 0,
-            "entries_matched_using_blacklist": 0,
-            "entries_unmatched": 0,
-            "entries_unsupported": 0,
-            "jikan_requests_total": 0,
-            "jikan_requests_cached": 0,
-            "jikan_requests_failed": 0,
-            "time_spent_waiting": 0,
-        }
+    def __new__(cls) -> "Statistics":
+        """Singleton constructor of the Statistics instance."""
+        if cls._instance is None:
+            cls._instance = super(Statistics, cls).__new__(cls)
+            cls.counters = {
+                "entries_processed": 0,
+                "entries_matched_manually": 0,
+                "entries_matched_using_jikan": 0,
+                "entries_matched_using_cache": 0,
+                "entries_matched_using_blacklist": 0,
+                "entries_unmatched": 0,
+                "entries_unsupported": 0,
+                "jikan_requests_total": 0,
+                "jikan_requests_cached": 0,
+                "jikan_requests_failed": 0,
+                "time_spent_waiting": 0,
+            }
+
+        return cls._instance
 
     def increment(self, name: str, amount: int = 1) -> None:
         """Increment value for a given statistic name."""
