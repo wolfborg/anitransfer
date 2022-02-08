@@ -60,12 +60,12 @@ class MappingCache:
         """Create a new MappingCache."""
         self.cache_file = cache_file
 
-    def add(self, name: str, myanimelist_id: int) -> None:
+    def add(self, name: str, myanimelist_id: str) -> None:
         """Add a mapping pair to the cache."""
         with open(self.cache_file, "r", encoding="utf-8") as before:
             cache = csv.reader(before)
             content = list(cache)
-            content.append([name, str(myanimelist_id)])
+            content.append([name, myanimelist_id])
             content = sorted(content, key=operator.itemgetter(0))
 
         with open(self.cache_file, "w", encoding="utf-8") as after:
