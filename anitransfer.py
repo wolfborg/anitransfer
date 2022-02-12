@@ -10,7 +10,7 @@ import datetime
 import logging
 import json
 import sys
-from typing import Any, Dict, Optional, List, Tuple, Union
+from typing import Any, Dict, Optional, List, Union
 
 # 3rd party imports
 from jikanpy import Jikan
@@ -320,13 +320,16 @@ def prepare_logging(log_level: str, log_file: str) -> logging.Logger:
 
 def auto_match_titles(
     anime_to_process: List[Dict[str, Optional[Union[str, int]]]],
+    processed: Dict[str, List[str]],
+    anime_to_process_manually: List[Dict[str, Optional[Union[str, int]]]],
     options: argparse.Namespace
-) -> Tuple[Dict[Any, Any], List[Dict[str, Optional[Union[str, int]]]], List[Any]]:
+) -> List[Dict[str, Optional[Union[str, int]]]]:
     """Match titles to myanimelist IDs based on their title and alternative titles."""
     with Progress() as progress:
         failures = []  # type: List[Dict[str, Optional[Union[str, int]]]]
         anime_to_process_manually = []
-        processed = {}
+        if not processed:
+            processed = {}
         progress.console.print(f'Will try to automatically assign {len(anime_to_process)} titles.')
         processing = progress.add_task('Retrieving info...', total=len(anime_to_process))
 
@@ -343,13 +346,13 @@ def auto_match_titles(
                     failures
                 )
 
-                if mal:
+                if mal and isinstance(anime["name"], str):
                     processed.update({anime['name']: mal})
                     mapping.add(str(anime['name']), mal[0])
                 else:
                     anime_to_process_manually.append(anime)
 
-            except APIException as exception:
+            except (ConnectionError, APIException) as exception:
                 entry = json.dumps({
                     'name': anime['name'],
                     'status': 'failure',
@@ -362,7 +365,46 @@ def auto_match_titles(
             finally:
                 progress.update(processing, advance=1)
 
-    return (processed, failures, anime_to_process_manually)
+    if failures:
+        rprint("Retrying failures...")
+        anime_to_process_manually = anime_to_process_manually +(
+            auto_match_titles(failures, processed, anime_to_process_manually, options)
+        )
+
+    return anime_to_process_manually
+
+
+def filter_anime(
+    entry: Dict[str, Optional[Union[str, int]]],
+    processed: Dict[str, List[str]],
+    anime_to_process: List[Dict[str, Optional[Union[str, int]]]],
+    options: argparse.Namespace
+) -> None:
+
+    if entry['name']:
+        name = str(entry['name'])
+
+    # check blacklist first
+    with Blacklist(options.bad_file) as blacklist:
+        if blacklist.lookup(name):
+            Statistics().increment('entries_matched_using_blacklist')
+            return
+
+    # continue if there's a chache hit
+    cached_title = MappingCache(options.cache_file).lookup(name)
+    if cached_title:
+        Statistics().increment('entries_matched_using_cache')
+        processed.update({name: [cached_title, name]})
+        return
+
+    # remove unsupported entries before internet lookup to save time
+    if entry['status']:
+        if entry['status'] == "won't watch":
+            Statistics().increment('entries_unsupported')
+            return
+
+    # append to list if no matches
+    anime_to_process.append(entry)
 
 
 def main() -> None:
@@ -370,14 +412,15 @@ def main() -> None:
     options = parse_arguments()
     prepare_logging(options.log_level, options.log_file)
     data = load_export(options.anime_list)
-    anime_to_process = []
-    anime_to_process_manually = []
+    anime_to_process = []  # List[Dict[str, Optional[Union[str, int]]]]
+    anime_to_process_manually = []  # type: List[Dict[str, Optional[Union[str, int]]]]
     failures = []  # type: List[Dict[str, Optional[Union[str, int]]]]
-    processed = {}
+    processed = {}  # type: Dict[str, List[str]]
 
     count = 0
 
     for entry in track(data['entries'], description='Filtering anime...'):
+        filter_anime(entry, processed, anime_to_process, options)
         # Use this for smaller tests
         if options.limit and count >= options.limit:
             break
@@ -385,42 +428,12 @@ def main() -> None:
         count = count + 1
         Statistics().increment('entries_processed')
 
-        # check blacklist first
-        with Blacklist(options.bad_file) as blacklist:
-            if blacklist.lookup(entry['name']):
-                Statistics().increment('entries_matched_using_blacklist')
-                continue
-
-        # continue if there's a chache hit
-        cache = MappingCache(options.cache_file)
-        if cache.lookup(entry['name']):
-            Statistics().increment('entries_matched_using_cache')
-            processed.update({entry['name']: cache.lookup(entry['name'])})
-            continue
-
-        # append to list if no matches
-        anime_to_process.append(entry)
-
-    matched, failures, anime_to_process_manually = auto_match_titles(
+    anime_to_process_manually = auto_match_titles(
         anime_to_process,
+        processed,
+        anime_to_process_manually,
         options=options
     )
-    processed = {**processed, **matched}
-    if failures:
-        rprint(f'Errors during processing. Will retry {len(failures)} failures once.')
-        reprocessed, failures, additional_anime_to_process_manually = auto_match_titles(
-            failures,
-            options=options
-        )
-        # merge dictionaries
-        processed = {**processed, **reprocessed}
-        anime_to_process_manually = anime_to_process_manually + additional_anime_to_process_manually
-        if failures:
-            rprint('Giving up on the following titles:')
-            for item in failures:
-                rprint(item['name'])
-
-    Statistics().increment('entries_unmatched', len(failures))
 
     for anime in anime_to_process_manually:
         # TODO: process them properly with search results
