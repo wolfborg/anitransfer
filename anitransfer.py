@@ -2,7 +2,6 @@
 """Convert an anime-planet.com export to MyAnimeList XML format."""
 
 # TODO: implement rich logging handler instead of streamhandler
-# TODO: re-enable and update manual matching
 
 # default imports
 import argparse
@@ -16,8 +15,10 @@ from typing import Any, Dict, Optional, List, Union
 from jikanpy import Jikan
 from jikanpy.exceptions import APIException
 from rich import print as rprint
-from rich.prompt import Confirm
+from rich.console import Console
+from rich.prompt import Confirm, Prompt
 from rich.progress import track, Progress
+from rich.table import Table
 
 # internal imports
 from utils.caches import RequestCache, MappingCache, Blacklist
@@ -318,7 +319,85 @@ def prepare_logging(log_level: str, log_file: str) -> logging.Logger:
     return logger
 
 
-def auto_match_titles(
+def match_titles_manually(
+    anime_to_process: List[Dict[str, Optional[Union[str, int]]]],
+    processed: Dict[str, List[str]],
+    options: argparse.Namespace
+) -> None:
+    """Match titles based on user input."""
+    rprint(f"Beginning matching of {len(anime_to_process)} titles.")
+
+    if not processed:
+        processed = {}
+    mapping = MappingCache(options.cache_file)
+    request_cache = RequestCache()
+
+    for anime in anime_to_process:
+        rprint(f'Looking up {anime["name"]}')
+        name = str(anime["name"])
+        sanitized_name = name.replace('&', 'and')
+        search_results = request_cache.lookup(
+            sanitized_name, "anime_search"
+        )  # type: Dict[str, Any]
+
+        most_likely_hit = search_results["results"][0]
+        single_result = request_cache.lookup(
+            most_likely_hit['mal_id'], "anime_title"
+        )  # type: Dict[str, Any]
+
+        # try single matches
+        response = suggest_single_title(name, most_likely_hit, single_result)
+
+        # stop if the user got tired of matching
+        if response is None:
+            break
+
+        # log a match if the user said to match
+        if response:
+            mapping.add(name, most_likely_hit['mal_id'])
+            Statistics().increment('entries_matched_manually')
+            continue
+
+        # give more suggestions if the user said not to match
+        # TODO: add multiple matching back
+        print("huh.")
+
+
+def suggest_single_title(
+    given_title: str,
+    suggestion: Dict[str, Union[bool, int, str]],
+    details: Dict[str, Any]
+) -> Optional[bool]:
+    """Suggest the most likely match to the user for manual matching."""
+    titles = []  # type: List[str]
+    if details.get('title_english'):
+        titles.append(details['title_english'])
+    if details.get('title_synonyms'):
+        titles = titles + details['title_synonyms']
+    rendered_titles = ",\n".join(titles)
+
+    table = Table(title=f"Matching: {given_title}")
+    table.add_column("Field")
+    table.add_column("Data")
+
+    table.add_row('Given Title', given_title)
+    table.add_row('Suggestion', str(suggestion['title']))
+    table.add_row('Alternative Titles', rendered_titles)
+    table.add_row('URL', str(suggestion['url']))
+    table.add_row('Cover', str(suggestion['image_url']))
+    Console().print(table, new_line_start=True, highlight=True)
+
+    choice = Prompt.ask('Accept this mapping?', choices=['y', 'n', 'abort'], default='y')
+    if choice == 'y':
+        return True
+
+    if choice == 'n':
+        return False
+
+    return None
+
+
+def match_titles_automatically(
     anime_to_process: List[Dict[str, Optional[Union[str, int]]]],
     processed: Dict[str, List[str]],
     anime_to_process_manually: List[Dict[str, Optional[Union[str, int]]]],
@@ -353,12 +432,15 @@ def auto_match_titles(
                     anime_to_process_manually.append(anime)
 
             except (ConnectionError, APIException) as exception:
-                entry = json.dumps({
+                entry = {
                     'name': anime['name'],
-                    'status': 'failure',
-                    'jikan_info': exception.error_json
-                    }, ensure_ascii=False)
-                logging.info("Failed to retrieve search results for: %s", entry)
+                    'status': 'failure'
+                }  # type: Dict[str, Any]
+                if isinstance(exception, APIException):
+                    entry.update({'jikan_info': exception.error_json})
+
+                message = json.dumps(entry, ensure_ascii=False)
+                logging.info("Failed to retrieve search results for: %s", message)
                 Statistics().increment('jikan_requests_failed')
                 failures.append(anime)
 
@@ -367,8 +449,8 @@ def auto_match_titles(
 
     if failures:
         rprint("Retrying failures...")
-        anime_to_process_manually = anime_to_process_manually +(
-            auto_match_titles(failures, processed, anime_to_process_manually, options)
+        anime_to_process_manually = anime_to_process_manually + (
+            match_titles_automatically(failures, processed, anime_to_process_manually, options)
         )
 
     return anime_to_process_manually
@@ -380,7 +462,7 @@ def filter_anime(
     anime_to_process: List[Dict[str, Optional[Union[str, int]]]],
     options: argparse.Namespace
 ) -> None:
-
+    """Preprocess anime list by filtering out things that do not need lookup via Jikan."""
     if entry['name']:
         name = str(entry['name'])
 
@@ -412,9 +494,8 @@ def main() -> None:
     options = parse_arguments()
     prepare_logging(options.log_level, options.log_file)
     data = load_export(options.anime_list)
-    anime_to_process = []  # List[Dict[str, Optional[Union[str, int]]]]
+    anime_to_process = []  # type: List[Dict[str, Optional[Union[str, int]]]]
     anime_to_process_manually = []  # type: List[Dict[str, Optional[Union[str, int]]]]
-    failures = []  # type: List[Dict[str, Optional[Union[str, int]]]]
     processed = {}  # type: Dict[str, List[str]]
 
     count = 0
@@ -428,24 +509,27 @@ def main() -> None:
         count = count + 1
         Statistics().increment('entries_processed')
 
-    anime_to_process_manually = auto_match_titles(
+    anime_to_process_manually = match_titles_automatically(
         anime_to_process,
         processed,
         anime_to_process_manually,
         options=options
     )
 
-    for anime in anime_to_process_manually:
-        # TODO: process them properly with search results
-        Statistics().increment('entries_unmatched')
-        failures.append(anime)
+    if anime_to_process_manually:
+        if options.non_interactive:
+            match = False
+            rprint('Skipping manual matching in non-interactive mode.')
+        else:
+            match = Confirm.ask(
+                f"Start manually mapping {len(anime_to_process_manually)} entries?", default=True
+            )
 
-    if anime_to_process_manually and not options.non_interactive:
-        Confirm.ask(
-            f"Start manually mapping {len(anime_to_process_manually)} entries?", default=True
-        )
-    else:
-        rprint('Skipping manual matching in non-interactive mode.')
+        if not match:
+            rprint('Will skip manual matching.')
+            Statistics().increment('entries_unmatched', len(anime_to_process_manually))
+        else:
+            match_titles_manually(anime_to_process_manually, processed, options)
 
     exporter = AnimeExporter(data['user']['name'], options.cache_file)
     for anime in data['entries']:

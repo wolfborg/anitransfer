@@ -105,9 +105,10 @@ class RequestCache:
     location = ""
     _supported_types = ["anime_title", "anime_search"]
 
-    def __init__(self) -> None:
+    def __init__(self, ignore_expiry: bool = True) -> None:
         """Create a new RequestCache."""
         self.location = os.path.join(user_cache_dir(), "anitransfer", "jikan_cache")
+        self.ignore_expiry = ignore_expiry
 
     def add(self, name: str, item_type: str, item: Dict[str, Any]) -> None:
         """Cache a Jikan API result."""
@@ -143,6 +144,13 @@ class RequestCache:
         date = parse(expiry_date)
         now = datetime.datetime.now(datetime.timezone.utc)
         if now > date:
+            if not self.ignore_expiry:
+                message = format_log({
+                    "name": name,
+                    "item_type": item_type,
+                    "key": key,
+                    "expiry_date": expiry_date})
+                logging.info("RequestCache: entry expired: %s", message)
             return None
 
         message = format_log({"name": name, "item_type": item_type, "key": key})
