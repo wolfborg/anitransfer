@@ -14,7 +14,7 @@ from jikanpy import Jikan
 from jikanpy.exceptions import APIException
 from rich import print as rprint
 from rich.console import Console
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm, Prompt, IntPrompt
 from rich.progress import track, Progress
 from rich.table import Table
 
@@ -281,8 +281,7 @@ def match_titles_manually(
 
     for anime in anime_to_process:
         name = str(anime["name"])
-        sanitized_name = name.replace("&", "and")
-        search_results = request_cache.lookup(sanitized_name, "anime_search")
+        search_results = request_cache.lookup(name, "anime_search")
         if not search_results:
             raise KeyError(
                 "Expected search results to be cached but could not find cache entry."
@@ -310,7 +309,9 @@ def match_titles_manually(
             continue
 
         # give more suggestions if the user said not to match
-        response_multi = suggest_multiple_titles(name, search_results["results"])
+        response_multi = suggest_multiple_titles(
+            name, search_results["results"], options
+        )
 
         # multi-selection: stop if the user got tired of matching
         if response_multi is None:
@@ -321,8 +322,14 @@ def match_titles_manually(
             Statistics().increment("entries_unmatched", unmatched)
             break
 
+        # multi-selection: ID added manually
+        if isinstance(response_multi, bool) and response_multi:
+            Statistics().increment("entries_added_manually")
+            continue
+
         # multi-selection: match selected
-        if response_multi:
+        # PS: bool is a subclass of int, so this has to be a negative condition
+        if not isinstance(response_multi, bool):
             mapping.add(name, search_results["results"][response_multi]["mal_id"])
             Statistics().increment("entries_matched_manually")
             continue
@@ -332,12 +339,15 @@ def match_titles_manually(
 
 
 def suggest_multiple_titles(
-    given_title: str, suggestions: List[Dict[str, Union[str, int, bool]]]
+    given_title: str,
+    suggestions: List[Dict[str, Union[str, int, bool]]],
+    options: argparse.Namespace,
 ) -> Optional[Union[bool, int]]:
     """Present several titles for manual matching to the user.
 
     Returns:
     - False if no matches are found
+    - True if the user added the ID manually
     - None if the user aborted
     - int if the user selected a title
     """
@@ -370,11 +380,21 @@ def suggest_multiple_titles(
     Console().print(table, new_line_start=True, highlight=True)
 
     choices.append("none")
+    choices.append("id")
     choices.append("abort")
-    response = Prompt.ask("Select match.", choices=choices, default=choices[0])
+    response = Prompt.ask("Select match", choices=choices, default=choices[0])
 
     if response.isdigit():
         return int(response)
+
+    # use case: user wants to add ID manually
+    if response == "id":
+        manual_id = IntPrompt.ask(
+            "Provide myanimelist.net ID",
+        )
+        mapping = MappingCache(options.cache_file)
+        mapping.add(given_title, str(manual_id))
+        return True
 
     # use case: user gets tired of matching
     if response == "abort":
@@ -402,9 +422,9 @@ def suggest_single_title(
     table.add_column("Field")
     table.add_column("Data")
 
-    table.add_row("Given Title", given_title)
     table.add_row("Suggestion", str(suggestion["title"]))
     table.add_row("Alternative Titles", rendered_titles)
+    table.add_row("Type (Episodes)", f"{suggestion['type']} ({suggestion['episodes']})")
     table.add_row("URL", str(suggestion["url"]))
     table.add_row("Cover", str(suggestion["image_url"]))
     Console().print(table, new_line_start=True, highlight=True)

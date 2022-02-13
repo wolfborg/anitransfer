@@ -19,6 +19,7 @@ class Statistics:
         if cls._instance is None:
             cls._instance = super(Statistics, cls).__new__(cls)
             cls.counters = {
+                "entries_added_manually": 0,
                 "entries_processed": 0,
                 "entries_matched_manually": 0,
                 "entries_matched_using_jikan": 0,
@@ -57,6 +58,7 @@ class Statistics:
             "dropped due to unsupported status",
             str(self.counters["entries_unsupported"]),
         )
+        table.add_row("Entries", "added manually", str(self.counters["entries_added_manually"]))
         table.add_row(
             "Matches",
             "matched via Jikan",
