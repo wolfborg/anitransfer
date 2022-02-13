@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Convert an anime-planet.com export to MyAnimeList XML format."""
 
-# TODO: implement rich logging handler instead of streamhandler
-
 # default imports
 import argparse
 import datetime
@@ -32,11 +30,12 @@ DEFAULTS = {
     'log_file': f'logs/log_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
     'log_level': 'WARNING',
     'cache_file': 'cache.csv',
+    'maximum_amount_of_matching_choices': 5,
     'bad_file': 'bad.csv',
     'outfile': 'convert.xml',
     'skip_confirm': False,
     'limit': None,
-}
+}  # type: Dict[str, Optional[Union[bool, int, str]]]
 
 
 def load_export(filename: str) -> Dict[str, Dict[Any, Any]]:
@@ -44,15 +43,6 @@ def load_export(filename: str) -> Dict[str, Dict[Any, Any]]:
     with open(filename, encoding='utf-8', mode='r') as source_file:
         content: Dict[str, Dict[Any, Any]] = json.load(source_file)
     return content
-
-
-# def optionsCheck(name, jdata):
-#     options = []
-#     for i in jdata['results']:
-#         options.append(str(i['title']).lower())
-#     if name.lower() in options:
-#         return options.index(name.lower())
-#     return False
 
 
 def verify(
@@ -112,47 +102,6 @@ def verify(
 
     logging.info('No results: %s', format_log({'name': name}))
     return None
-
-    # found = optionsCheck(name, jdata)
-    # if found:
-    #     return [str(jdata['results'][found]['title']), found]
-
-    # print('Initial title: ' + name)
-    # print(f'Found title: {entry["title"]} ({entry["url"]})')
-
-    # return verify1(name, entry['title'], jdata)
-
-
-# def verify1(name, jname, jdata):
-#     q1 = 'Is this correct? [y/n]: '
-
-#     # skips the prompt if set
-#     skip = parse_arguments().skip_confirm
-#     if skip:
-#         print(q1 + 'SKIP')
-#         return False
-
-#     v1 = input(q1)
-#     if v1.strip().lower() == 'n':
-#         options = []
-#         for i in jdata['results']:
-#             options.append(f"{i['title']}\n    ({i['url']})")
-#         print()
-#         print('Initial title: ' + name)
-#         print('[OTHER OPTIONS]')
-#         x = 1
-#         for o in options:
-#             print('[' + str(x) + '] ' + o)
-#             if x >= 9:
-#                 break
-#             x = x+1
-#         print('[0] None of these')
-#         return verify2(options)
-#     elif v1.strip().lower() == 'y': return [jname, 0]
-#     else:
-#         print('ERROR: Bad input. Asking again.')
-#         return verify1(name, jname, jdata)
-#     return False
 
 
 # def verify2(options):
@@ -333,50 +282,126 @@ def match_titles_manually(
     request_cache = RequestCache()
 
     for anime in anime_to_process:
-        rprint(f'Looking up {anime["name"]}')
         name = str(anime["name"])
         sanitized_name = name.replace('&', 'and')
         search_results = request_cache.lookup(
             sanitized_name, "anime_search"
-        )  # type: Dict[str, Any]
+        )
+        if not search_results:
+            raise KeyError("Expected search results to be cached but could not find cache entry.")
 
         most_likely_hit = search_results["results"][0]
         single_result = request_cache.lookup(
             most_likely_hit['mal_id'], "anime_title"
-        )  # type: Dict[str, Any]
+        )
 
         # try single matches
-        response = suggest_single_title(name, most_likely_hit, single_result)
+        response_single = suggest_single_title(name, most_likely_hit, single_result)
 
-        # stop if the user got tired of matching
-        if response is None:
+        # single: stop if the user got tired of matching
+        if response_single is None:
+            unmatched = len(anime_to_process) - Statistics().counters['entries_matched_manually']
+            Statistics().increment('entries_unmatched', unmatched)
             break
 
-        # log a match if the user said to match
-        if response:
+        # single: log a match if the user said to match
+        if response_single:
             mapping.add(name, most_likely_hit['mal_id'])
             Statistics().increment('entries_matched_manually')
             continue
 
         # give more suggestions if the user said not to match
-        # TODO: add multiple matching back
-        print("huh.")
+        response_multi = suggest_multiple_titles(name, search_results['results'])
+
+        # multi-selection: stop if the user got tired of matching
+        if response_multi is None:
+            unmatched = len(anime_to_process) - Statistics().counters['entries_matched_manually']
+            Statistics().increment('entries_unmatched', unmatched)
+            break
+
+        # multi-selection: match selected
+        if response_multi:
+            mapping.add(name, search_results['results'][response_multi]['mal_id'])
+            Statistics().increment('entries_matched_manually')
+            continue
+
+        # multi-selection: no match found
+        Statistics().increment('entries_unmatched')
+
+
+def suggest_multiple_titles(
+    given_title: str,
+    suggestions: List[Dict[str, Union[str, int, bool]]]
+) -> Optional[Union[bool, int]]:
+    """Present several titles for manual matching to the user.
+
+    Returns:
+    - False if no matches are found
+    - None if the user aborted
+    - int if the user selected a title
+    """
+    if not isinstance(DEFAULTS['maximum_amount_of_matching_choices'], int):
+        raise TypeError("maximum_amount_of_matching_choices must be an integer.")
+
+    maximum = DEFAULTS['maximum_amount_of_matching_choices']
+    if len(suggestions) < maximum:
+        maximum = len(suggestions)
+
+    choices = []  # type: List[str]
+    table = Table(
+        title=f"Advanced matching: {given_title}",
+        show_lines=True,
+        highlight=True,
+        expand=True
+    )
+    table.add_column("Suggestion #")
+    table.add_column("Title Information")
+
+    for index in range(0, maximum):
+        help_text = (
+            f"{suggestions[index]['title']} ({suggestions[index]['episodes']} episodes)\n"
+            f"URL: {suggestions[index]['url']}\n"
+            f"Cover: {suggestions[index]['image_url']}"
+        )
+        table.add_row(str(index), help_text)
+        choices.append(str(index))
+
+    Console().print(table, new_line_start=True, highlight=True)
+
+    choices.append('none')
+    choices.append('abort')
+    response = Prompt.ask("Select match.", choices=choices, default=choices[0])
+
+    if response.isdigit():
+        return int(response)
+
+    # use case: user gets tired of matching
+    if response == 'abort':
+        return None
+
+    # no matches
+    return False
 
 
 def suggest_single_title(
     given_title: str,
     suggestion: Dict[str, Union[bool, int, str]],
-    details: Dict[str, Any]
+    details: Optional[Dict[str, Any]]
 ) -> Optional[bool]:
     """Suggest the most likely match to the user for manual matching."""
     titles = []  # type: List[str]
-    if details.get('title_english'):
-        titles.append(details['title_english'])
-    if details.get('title_synonyms'):
-        titles = titles + details['title_synonyms']
+    if details:
+        if details.get('title_english'):
+            titles.append(details['title_english'])
+        if details.get('title_synonyms'):
+            titles = titles + details['title_synonyms']
     rendered_titles = ",\n".join(titles)
 
-    table = Table(title=f"Matching: {given_title}")
+    table = Table(
+        title=f"Matching: {given_title}",
+        highlight=True,
+        expand=True
+    )
     table.add_column("Field")
     table.add_column("Data")
 
@@ -387,7 +412,7 @@ def suggest_single_title(
     table.add_row('Cover', str(suggestion['image_url']))
     Console().print(table, new_line_start=True, highlight=True)
 
-    choice = Prompt.ask('Accept this mapping?', choices=['y', 'n', 'abort'], default='y')
+    choice = Prompt.ask('Accept this match?', choices=['y', 'n', 'abort'], default='y')
     if choice == 'y':
         return True
 

@@ -40,7 +40,11 @@ class Statistics:
 
     def print_summary(self) -> None:
         """Print a formatted summary of the statistics."""
-        table = Table(title="anitransfer summary")
+        table = Table(
+            title="anitransfer summary",
+            highlight=True,
+            row_styles=["", "dim"]
+            )
 
         table.add_column("Section")
         table.add_column("Action")
