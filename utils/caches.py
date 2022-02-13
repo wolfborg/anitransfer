@@ -151,7 +151,7 @@ class RequestCache:
                     "key": key,
                     "expiry_date": expiry_date})
                 logging.info("RequestCache: entry expired: %s", message)
-            return None
+                return None
 
         message = format_log({"name": name, "item_type": item_type, "key": key})
         logging.info("RequestCache: found: %s", message)
