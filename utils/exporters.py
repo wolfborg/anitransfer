@@ -87,6 +87,8 @@ class AnimeExporter:
             score = ET.SubElement(entry, "my_score ")
             if anime["rating"]:
                 score.text = str(int(anime["rating"] * 2))
+            else:
+                score.text = str(0)
 
             # status
             ET.SubElement(entry, "my_status").text = MAPPING[str(anime["status"])]
@@ -97,8 +99,8 @@ class AnimeExporter:
             )
 
         dom = minidom.parseString(ET.tostring(root))
-        pretty_dom = dom.toprettyxml(indent="\t")
-        with open(filepath, "w", encoding="utf-8") as export_file:
+        pretty_dom = dom.toprettyxml(indent="\t", encoding="UTF-8")
+        with open(filepath, "wb") as export_file:
             export_file.write(pretty_dom)
 
 
