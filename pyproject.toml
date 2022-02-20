@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anitransfer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Convert an anime-planet.com export to MyAnimeList XML format."
 authors = ["Derek Chaplin <chaplin.derek@gmail.com>, Alexander Skiba <ghostlyrics@gmail.com>"]
 license = "MIT"
