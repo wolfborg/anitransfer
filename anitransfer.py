@@ -100,19 +100,6 @@ def verify(
     return None
 
 
-# def verify2(options):
-#     q2 = 'Enter number for correct choice: '
-#     v2 = input(q2)
-#     if v2.strip() == '0': return False
-#     elif int(v2) != False:
-#         # print('option selected: ' + options[int(v2)-1])
-#         return [options[int(v2)-1], int(v2)-1]
-#     else:
-#         print('ERROR: Bad input. Asking again.')
-#         return verify2(options)
-#     return False
-
-
 def search_anime(
     name: str,
     options: argparse.Namespace,
