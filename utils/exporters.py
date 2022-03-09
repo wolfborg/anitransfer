@@ -122,6 +122,8 @@ def _convert_times_watched(times: Optional[Union[int, str]]) -> str:
     """Convert different counting systems between sites.
 
     Provide a default of 0 if no amount is found.
+    - anime-planet.com counts **total times watched**
+    - myanimelist.net counts **rewatches**
     """
     # case: times is not assigned
     if not times:
@@ -134,7 +136,7 @@ def _convert_times_watched(times: Optional[Union[int, str]]) -> str:
         else:
             times = 0
 
-    if times > 1:
+    if times >= 1:
         times = times - 1
 
     return str(times)
