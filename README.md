@@ -5,7 +5,8 @@ This requires [poetry][] on your machine for easier management of Python project
 Install dependencies in a virtual environment. This is required only once.
 
 ```bash
-poetry install
+# remove the --no-dev flag to include development tools
+poetry install --no-dev
 ```
 
 Run the conversion.
