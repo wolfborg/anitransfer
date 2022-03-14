@@ -5,19 +5,20 @@ This requires [poetry][] on your machine for easier management of Python project
 Install dependencies in a virtual environment. This is required only once.
 
 ```bash
-poetry install
+# remove the --no-dev flag to include development tools
+poetry install --no-dev
 ```
 
 Run the conversion.
 ```bash
-poetry run anitransfer.py path/to/your/file.json
+poetry run python anitransfer.py path/to/your/file.json
 
 # example
-poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
+poetry run python anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
 ```
 
 If you would like to see a full list of available options, run 
-`poetry run anitransfer.py --help`.
+`poetry run python anitransfer.py --help`.
 
 [poetry]: https://python-poetry.org
 

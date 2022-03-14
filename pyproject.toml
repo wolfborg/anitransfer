@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anitransfer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Convert an anime-planet.com export to MyAnimeList XML format."
 authors = ["Derek Chaplin <chaplin.derek@gmail.com>, Alexander Skiba <ghostlyrics@gmail.com>"]
 license = "MIT"
@@ -8,8 +8,16 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.8"
 jikanpy = "^4.3.2"
+rich = "^11.0.0"
+appdirs = "^1.4.4"
+python-dateutil = "^2.8.2"
+defusedxml = "^0.7.1"
 
 [tool.poetry.dev-dependencies]
+black = "^22.1.0"
+types-appdirs = "^1.4.2"
+mypy = "^0.940"
+types-python-dateutil = "^2.8.9"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
