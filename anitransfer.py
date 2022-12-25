@@ -16,6 +16,7 @@ import sys, os
 import pyperclip
 from dotenv import load_dotenv
 
+sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 
@@ -96,7 +97,7 @@ def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
     logger.setLevel(logging.DEBUG)
 
     consoleHandler = logging.StreamHandler(sys.stdout)
-    fileHandler = logging.FileHandler(LOG_FILE_NAME)
+    fileHandler = logging.FileHandler(filename=LOG_FILE_NAME, mode='w', encoding='utf-8')
     consoleHandler.setLevel(logging.DEBUG)
     fileHandler.setLevel(logging.WARNING)
     
