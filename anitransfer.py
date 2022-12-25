@@ -12,8 +12,14 @@ import time
 import requests
 import logging
 from datetime import date
-import sys
+import sys, os
 import pyperclip
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
@@ -246,7 +252,7 @@ def malSearch(name):
 
     if isinstance(jver, str):
         return jver
-
+    
     return [str(jdata['data'][jver[1]]['mal_id']), jver[0]]
 
 
