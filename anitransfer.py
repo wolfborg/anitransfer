@@ -111,20 +111,11 @@ def jverify(name, jdata):
     return verify1(name, jname, jdata)
 
 def verify1(name, jname, jdata):
-    # q1 = 'Is this correct? [y/n]: '
-
-    #skips the prompt if set
     skip = parse_arguments().skip_confirm
     if skip:
-        # print(q1 + 'SKIP')
         print('SKIP')
         return False
 
-    # v1 = input(q1)
-    # if v1.strip().lower() == 'n':
-        # return displayOptions(name, jdata)
-    # elif v1.strip().lower() == 'y':
-    #     return [jname, 0]
     return displayOptions(name, jdata)  #delete this when switching things back
     # print('ERROR: Bad input. Asking again.')
     # return verify1(name, jname, jdata)
@@ -331,13 +322,21 @@ def main():
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
-        if str(i['started']) == "None": wsd.text = "0000-00-00"
-        else: wsd.text = str(i['started']).split()[0]
-        if str(i['completed']) == "None": wfd.text = "0000-00-00"
-        else: wfd.text = str(i['completed']).split()[0]
+
+        wsd.text = "0000-00-00"
+        wfd.text = "0000-00-00"
         score.text = str(int(i['rating']*2))
-        if (i['times'] > 1): twatched.text = str(i['times']-1)
-        else: twatched.text = "0"
+        twatched.text = "0"
+
+        if str(i['started']) != "None": 
+            wsd.text = str(i['started']).split()[0]
+        
+        if str(i['completed']) != "None":
+            wfd.text = str(i['completed']).split()[0]
+
+        # becomes num of rewatches on MAL, so subtract 1
+        if (i['times'] > 1):
+            twatched.text = str(i['times']-1)
 
         #MUST use 4 second delay for Jikan's rate limit
         if cached == False:
