@@ -1,3 +1,8 @@
-logs/*
+/logs/*
 !logs/.gitkeep
-convert*.xml
+/convert*.xml
+/converted/
+/samples/
+__pycache__/
+*.py[cod]
+*$py.class
