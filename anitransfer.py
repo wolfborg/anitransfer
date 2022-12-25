@@ -84,7 +84,7 @@ def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
     consoleHandler = logging.StreamHandler(sys.stdout)
     fileHandler = logging.FileHandler(LOG_FILE_NAME)
     consoleHandler.setLevel(logging.DEBUG)
-    fileHandler.setLevel(logging.DEBUG)
+    fileHandler.setLevel(logging.WARNING)
     
     consoleFormatter = logging.Formatter('%(message)s')
     fileFormatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
