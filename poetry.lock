@@ -18,6 +18,14 @@ python-versions = ">=3.6.0"
 unicode_backport = ["unicodedata2"]
 
 [[package]]
+name = "dotenv"
+version = "0.0.5"
+description = "Handle .env files"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "idna"
 version = "3.4"
 description = "Internationalized Domain Names in Applications (IDNA)"
@@ -75,11 +83,12 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "6cd77f3b8ccb2d9ef2bb23c98fff132aae97318b38a210b3833cbd736c34ce73"
+content-hash = "58125537a4460cde68350506ffdfc2c583ff56699ad3514da6e8485fc7b2f0a4"
 
 [metadata.files]
 certifi = []
 charset-normalizer = []
+dotenv = []
 idna = []
 pyperclip = []
 requests = [
