@@ -54,7 +54,7 @@ def parse_arguments():
     )
     parser.add_argument(
         '--skip-confirm',
-        help='Skip any confirmation prompts that show up',
+        help='Skip any confirmation prompts that show up, still tries initial search for entries',
         default=DEFAULTS['skip_confirm'],
         action='store_true'
     )
@@ -175,8 +175,7 @@ def jverify(name, jdata):
     return displayOptions(jdata)
 
 def displayOptions(jdata):
-    skip = args.skip_confirm
-    if skip:
+    if args.skip_confirm:
         logger.info('SKIP: Skipping confirmation')
         return False
 
