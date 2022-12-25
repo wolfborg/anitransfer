@@ -23,7 +23,7 @@ load_dotenv()
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'jikan_delay': 4, # in seconds
+    'api_delay': 4, # in seconds
     'log_file': f'logs/anitransfer_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
@@ -40,9 +40,9 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        '--jikan-delay',
-        help='Delay between API requests to Jikan in seconds',
-        default=DEFAULTS['jikan_delay'],
+        '--api-delay',
+        help='Delay between API requests in seconds',
+        default=DEFAULTS['api_delay'],
         type=int
     )
     parser.add_argument(
@@ -222,19 +222,9 @@ def prompt(options, numOptions):
     logger.debug('ERROR: Bad input. Asking again.')
     return prompt(options, numOptions)
 
-def malSearch(name):
-    print()
-    logger.info('Initial title: ' + name)
-    pyperclip.copy(name)
-
-    if len(name) < 3:
-        logger.error("Search title too small - " + name)
-        return False
-
-    rname = name.replace('&','and')
-
+def jikanSearch(name):
     try:
-        jikan = requests.get("https://api.jikan.moe/v4/anime?q="+rname)
+        jikan = requests.get("https://api.jikan.moe/v4/anime?q="+name)
         jfile = jikan.json()
     except:
         logger.error("Jikan request failed")
@@ -256,7 +246,75 @@ def malSearch(name):
     
     return [str(jdata['data'][jver[1]]['mal_id']), jver[0]]
 
+def malTitlesCheck(name, titles):
+    if name in titles:
+        return True
+    return False
 
+def malPrintSearchInfo(id, titles):
+    print("MAL ID: "+id)
+    for a in titles:
+        print(" - "+a)
+
+def malSearch(name):
+    try:
+        headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
+        url = "https://api.myanimelist.net/v2/anime?q="+name
+        fields = "id,title,alternative_titles,start_date,end_date,media_type,num_episodes,start_season,source,average_episode_duration,studios"
+        url += "&fields="+fields+"&limit=5"
+        mal = requests.get(url, headers=headers)
+        malFile = mal.json()
+    except:
+        logger.error("MAL request failed")
+        return False
+
+    malData = json.loads(json.dumps(malFile))
+    malEntries = malData['data']
+    for entry in malEntries:
+        node = entry['node']
+        id = str(node['id'])
+        link = "https://myanimelist.net/anime/"+id
+        title = node['title']
+
+        titles = []
+        alt_titles = node['alternative_titles']
+
+        if 'en' in alt_titles:
+            titles.append(alt_titles['en'])
+        titles.append(title)
+
+        if 'synonyms' in alt_titles:
+            for synonyms in alt_titles['synonyms']:
+                titles.append(synonyms)
+
+        titleCheck = malTitlesCheck(name, titles)
+        if titleCheck:
+            logger.info("MAL Match Found: "+id)
+            return id
+
+        malPrintSearchInfo(id, titles)
+        if args.with_links:
+            print(link)
+        print()
+    return False
+
+def search(name):
+    print()
+    logger.info('Anime Planet title: ' + name)
+    pyperclip.copy(name)
+
+    if len(name) < 3:
+        logger.error("Search title too small - " + name)
+        return False
+    
+    name = name.replace('&','and')
+
+    malResult = malSearch(name)
+    if malResult:
+        return malResult
+
+    jikanResults = jikanSearch(name)
+    return jikanResults
 
 def main():
     #Start MAL XML structure
@@ -289,15 +347,15 @@ def main():
         entryid = cacheSearch(name, args.cache_file)
         if entryid == False:
             if args.cache_only:
-                logger.info('CACHE ONLY: Skipping Jikan search')
+                logger.info('CACHE ONLY: Skipping search')
                 notFound += 1
                 logger.error("Couldn't find - " + name)
                 continue
             
             print('==============')
-            mal = malSearch(name)
+            mal = search(name)
             if mal == False:
-                delayCheck(args.jikan_delay)
+                delayCheck(args.api_delay)
                 notFound += 1
                 continue
             else:
@@ -350,13 +408,13 @@ def main():
         if (i['times'] > 1):
             twatched.text = str(i['times']-1)
 
-        #MUST use 4 second delay for Jikan's rate limit
+        #MUST use 4 second delay for API rate limits
         if cached == False:
             name = i['name']
             jname = mal[1]
             strlog = str(count) + ": " + name + " ---> " + jname
             logger.info("Adding to cache: "+strlog)
-            delayCheck(args.jikan_delay)
+            delayCheck(args.api_delay)
 
     total.text = str(cacheFound + searchFound)
 
