@@ -9,8 +9,7 @@ import datetime
 import json
 import math
 import time
-
-from jikanpy import Jikan
+import requests
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
@@ -18,6 +17,7 @@ DEFAULTS = {
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
     'skip_confirm': False,
+    'cache_only': False,
     'limit': -1,
 }
 
@@ -91,74 +91,84 @@ def delayCheck(delay):
 
 def optionsCheck(name, jdata):
     options = []
-    for i in jdata['results']:
+    for i in jdata['data']:
         options.append(str(i['title']).lower())
     if name.lower() in options:
         return options.index(name.lower())
     return False
 
 def jverify(name, jdata):
-    jname = str(jdata['results'][0]['title'])
+    jname = str(jdata['data'][0]['title'])
     if name.lower() == jname.lower():
         return [jname, 0]
 
     found = optionsCheck(name, jdata)
     if found != False:
-        return [str(jdata['results'][found]['title']), found]
+        return [str(jdata['data'][found]['title']), found]
 
-    print('Found title: ' + jname)
+    # print('Found title: ' + jname)
 
     return verify1(name, jname, jdata)
 
 def verify1(name, jname, jdata):
-    q1 = 'Is this correct? [y/n]: '
+    # q1 = 'Is this correct? [y/n]: '
 
     #skips the prompt if set
     skip = parse_arguments().skip_confirm
     if skip:
-        print(q1 + 'SKIP')
+        # print(q1 + 'SKIP')
+        print('SKIP')
         return False
 
-    v1 = input(q1)
-    if v1.strip().lower() == 'n':
-        options = []
-        for i in jdata['results']:
-            options.append(str(i['title']))
-        print()
-        print('Initial title: ' + name)
-        print('[OTHER OPTIONS]')
-        x = 1
-        for o in options:
-            print('[' + str(x) + '] ' + o)
-            if x >= 9:
-                break
-            x = x+1
-        print('[0] None of these')
-        return verify2(options)
-    elif v1.strip().lower() == 'y': return [jname, 0]
-    else:
-        print('ERROR: Bad input. Asking again.')
-        return verify1(name, jname, jdata)
-    return False
+    # v1 = input(q1)
+    # if v1.strip().lower() == 'n':
+        # return displayOptions(name, jdata)
+    # elif v1.strip().lower() == 'y':
+    #     return [jname, 0]
+    return displayOptions(name, jdata)  #delete this when switching things back
+    # print('ERROR: Bad input. Asking again.')
+    # return verify1(name, jname, jdata)
 
-def verify2(options):
-    q2 = 'Enter number for correct choice: '
-    v2 = input(q2)
-    if v2.strip() == '0': return False
-    elif int(v2) != False:
+def displayOptions(name, jdata):
+    limit = 20
+    options = []
+    for i in jdata['data']:
+        options.append(str(i['title']))
+    print()
+    # print('Initial title: ' + name)
+    print('[OTHER OPTIONS]')
+    x = 1
+    for entry in jdata['data']:
+        title = str(entry['title'])
+        url = str(entry['url'])
+        options.append(title)
+        print('[' + str(x) + '] ' + title)
+        print(url)
+        print()
+        if x >= limit:
+            break
+        x = x+1
+    print('[i] Manual ID')
+    print('[n] Skip entry')
+    return verify2(options, limit)
+
+def verify2(options, limit):
+    v2 = input('Enter number for correct choice: ')
+    if v2.strip() == '' or v2.strip() == 'n':
+        return False
+    elif v2.strip() == 'i':
+        malID = input("Enter MAL ID: ")
+        return malID
+    elif v2.isdigit() and int(v2) <= limit:
         #print('option selected: ' + options[int(v2)-1])
         return [options[int(v2)-1], int(v2)-1]
-    else:
-        print('ERROR: Bad input. Asking again.')
-        return verify2(options)
-    return False
+    
+    print('ERROR: Bad input. Asking again.')
+    return verify2(options, limit)
 
 def malSearch(name):
     print()
     print('Initial title: ' + name)
-
-    #Initiate Jikan
-    jikan = Jikan()
 
     if len(name) < 3:
         log(1, name)
@@ -167,19 +177,27 @@ def malSearch(name):
     rname = name.replace('&','and')
 
     try:
-        jfile = jikan.search('anime', rname)
+        jikan = requests.get("https://api.jikan.moe/v4/anime?q="+rname)
+        jfile = jikan.json()
     except:
         log(2, name)
         return False
 
     jdata = json.loads(json.dumps(jfile))
+    if len(jdata['data']) == 0:
+        log(2, name)
+        return False
+
     jver = jverify(name, jdata)
 
     if jver == False:
         log(2, name)
         return False
 
-    return [str(jdata['results'][jver[1]]['mal_id']), jver[0]]
+    if isinstance(jver, str):
+        return jver
+
+    return [str(jdata['data'][jver[1]]['mal_id']), jver[0]]
 
 def parse_arguments():
     """Parse given command line arguments."""
@@ -215,6 +233,12 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
+        '--cache-only',
+        help='Runs process without looking up new matches, only cache mappings used.',
+        default=DEFAULTS['cache_only'],
+        action='store_true'
+    )
+    parser.add_argument(
         '--limit',
         help='Limits the number of entries to process',
         default=DEFAULTS['limit'],
@@ -241,6 +265,9 @@ def main():
 
     count = 0
 
+    cacheFound = 0
+    searchFound = 0
+    notFound = 0
     for i in data['entries']:
         #Use this for smaller tests
         limit = options.limit
@@ -256,14 +283,29 @@ def main():
             log(2, name)
             continue
 
-        mal = cacheSearch(name, options.cache_file)
-        if mal == False:
+        entryid = cacheSearch(name, options.cache_file)
+        if entryid == False:
+            if options.cache_only:
+                print('CACHE ONLY: Skipping Jikan search')
+                notFound += 1
+                log(2, name)
+                continue
+            
+            print('==============')
             mal = malSearch(name)
             if mal == False:
                 delayCheck(options.jikan_delay)
+                notFound += 1
                 continue
-            else: cache(i['name'], mal[0], options.cache_file)
-        else: cached = True
+            else:
+                if isinstance(mal, str) == False:
+                    mal = mal[0]
+                cache(i['name'], mal, options.cache_file)
+                entryid = mal
+                searchFound += 1
+        else:
+            cached = True
+            cacheFound += 1
 
         #Convert status
         stat = i['status']
@@ -285,11 +327,7 @@ def main():
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
 
-        if cached == False:
-            malid.text = mal[0]
-        else:
-            malid.text = mal
-
+        malid.text = entryid
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
@@ -307,11 +345,17 @@ def main():
             delayCheck(options.jikan_delay)
 
     #Export XML to convert file
-    tree = ET.ElementTree(root)
+    #tree = ET.ElementTree(root)
     dom = minidom.parseString(ET.tostring(root))
     dom = dom.toprettyxml(indent='\t')
     with open('convert.xml', 'w', encoding='utf-8') as f2:
         f2.write(dom)
+
+    print("=================================")
+    print("Total Entries: "+str(len(data['entries'])))
+    print("Cache Found: "+str(cacheFound))
+    print("Search Found: "+str(searchFound))
+    print("Not Found: "+str(notFound))
 
 
 if __name__ == "__main__":
