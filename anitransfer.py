@@ -21,6 +21,7 @@ DEFAULTS = {
     'bad_file': 'bad.csv',
     'skip_confirm': False,
     'cache_only': False,
+    'with_links': False,
     'limit': -1,
 }
 
@@ -64,6 +65,12 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
+        '--with-links',
+        help='Displays links to found MyAnimeList entries to help with manual confirmation.',
+        default=DEFAULTS['with_links'],
+        action='store_true'
+    )
+    parser.add_argument(
         '--limit',
         help='Limits the number of entries to process',
         default=DEFAULTS['limit'],
@@ -71,10 +78,10 @@ def parse_arguments():
     )
     parser.add_argument('anime_list')
 
-    options = parser.parse_args()
-    return options
+    args = parser.parse_args()
+    return args
 
-options = parse_arguments()
+args = parse_arguments()
 
 def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
     """Sets up and returns a log file to be used during a script."""
@@ -96,7 +103,7 @@ def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
 
     return logger
 
-logger = setupLogger(options.log_file)
+logger = setupLogger(args.log_file)
 
 #Loads JSON file
 def loadJSON(filename):
@@ -168,7 +175,7 @@ def jverify(name, jdata):
     return displayOptions(jdata)
 
 def displayOptions(jdata):
-    skip = parse_arguments().skip_confirm
+    skip = args.skip_confirm
     if skip:
         logger.info('SKIP: Skipping confirmation')
         return False
@@ -185,8 +192,9 @@ def displayOptions(jdata):
         url = str(entry['url'])
         options.append(title)
         print('[' + str(x) + '] ' + title)
-        print(url)
-        print()
+        if args.with_links:
+            print(url)
+            print()
         if x >= numOptions:
             break
         x = x+1
@@ -249,7 +257,7 @@ def main():
     uname = ET.SubElement(info, 'user_name')
     total = ET.SubElement(info, 'user_total_anime')
 
-    data = loadJSON(options.anime_list)
+    data = loadJSON(args.anime_list)
     uname.text = data['user']['name']
 
     count = 0
@@ -258,7 +266,7 @@ def main():
     notFound = 0
     for i in data['entries']:
         #Use this for smaller tests
-        limit = options.limit
+        limit = args.limit
         if limit > -1 and count >= limit:
             break
 
@@ -266,13 +274,13 @@ def main():
         count = count + 1
 
         name = i['name']
-        if badSearch(name, options.bad_file):
+        if badSearch(name, args.bad_file):
             logger.error("Couldn't find - " + name)
             continue
 
-        entryid = cacheSearch(name, options.cache_file)
+        entryid = cacheSearch(name, args.cache_file)
         if entryid == False:
-            if options.cache_only:
+            if args.cache_only:
                 logger.info('CACHE ONLY: Skipping Jikan search')
                 notFound += 1
                 logger.error("Couldn't find - " + name)
@@ -281,13 +289,13 @@ def main():
             print('==============')
             mal = malSearch(name)
             if mal == False:
-                delayCheck(options.jikan_delay)
+                delayCheck(args.jikan_delay)
                 notFound += 1
                 continue
             else:
                 if isinstance(mal, str) == False:
                     mal = mal[0]
-                cache(i['name'], mal, options.cache_file)
+                cache(i['name'], mal, args.cache_file)
                 entryid = mal
                 searchFound += 1
         else:
@@ -340,7 +348,7 @@ def main():
             jname = mal[1]
             strlog = str(count) + ": " + name + " ---> " + jname
             logger.info("Adding to cache: "+strlog)
-            delayCheck(options.jikan_delay)
+            delayCheck(args.jikan_delay)
 
     total.text = str(cacheFound + searchFound)
 
