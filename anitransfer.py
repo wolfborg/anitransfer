@@ -13,6 +13,7 @@ import requests
 import logging
 from datetime import date
 import sys
+import pyperclip
 
 DEFAULTS = {
     'jikan_delay': 4, # in seconds
@@ -217,6 +218,7 @@ def prompt(options, numOptions):
 def malSearch(name):
     print()
     logger.info('Initial title: ' + name)
+    pyperclip.copy(name)
 
     if len(name) < 3:
         logger.error("Search title too small - " + name)
