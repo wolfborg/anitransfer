@@ -245,7 +245,7 @@ def malSearch(name):
 
 
 def main():
-    #Start XML structure
+    #Start MAL XML structure
     root = ET.Element('myanimelist')
     info = ET.SubElement(root, 'myinfo')
     uname = ET.SubElement(info, 'user_name')
@@ -253,7 +253,6 @@ def main():
 
     data = loadJSON(options.anime_list)
     uname.text = data['user']['name']
-    total.text = str(len(data['entries']))
 
     count = 0
     cacheFound = 0
@@ -344,6 +343,8 @@ def main():
             strlog = str(count) + ": " + name + " ---> " + jname
             logger.info("Adding to cache: "+strlog)
             delayCheck(options.jikan_delay)
+
+    total.text = str(cacheFound + searchFound)
 
     #Export XML to convert file
     #tree = ET.ElementTree(root)
