@@ -142,7 +142,6 @@ def delayCheck(delay):
     dtime = now - qtime
     secs = dtime.total_seconds()
     diff = math.ceil(delay - secs)
-    #print('TIME DELAY: ' + str(diff))
     if secs < delay:
         time.sleep(diff)
     qtime = datetime.datetime.now()
@@ -171,7 +170,7 @@ def jverify(name, jdata):
 def displayOptions(jdata):
     skip = parse_arguments().skip_confirm
     if skip:
-        print('SKIP')
+        logger.info('SKIP: Skipping confirmation')
         return False
 
     numOptions = 10
@@ -205,19 +204,18 @@ def prompt(options, numOptions):
     elif v2.isdigit() and int(v2) <= numOptions:
         return [options[int(v2)-1], int(v2)-1]
     
-    print('ERROR: Bad input. Asking again.')
+    logger.debug('ERROR: Bad input. Asking again.')
     return prompt(options, numOptions)
 
 def malSearch(name):
     print()
-    print('Initial title: ' + name)
+    logger.info('Initial title: ' + name)
 
     if len(name) < 3:
         logger.error("Search title too small - " + name)
         return False
 
     rname = name.replace('&','and')
-    errorStr = "ERROR: Couldn't find - " + name
 
     try:
         jikan = requests.get("https://api.jikan.moe/v4/anime?q="+rname)
@@ -234,7 +232,7 @@ def malSearch(name):
     jver = jverify(name, jdata)
 
     if jver == False:
-        logger.error(errorStr)
+        logger.error("Couldn't find - " + name)
         return False
 
     if isinstance(jver, str):
