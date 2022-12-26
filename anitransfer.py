@@ -23,7 +23,7 @@ load_dotenv()
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'api_delay': 4, # in seconds
+    'api_delay': 1.5, # in seconds
     'log_file': f'logs/anitransfer_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
