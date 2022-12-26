@@ -193,16 +193,16 @@ def jikanSearch(name):
         url = "https://api.jikan.moe/v4/anime?q="+name.replace('&','%26amp;')
         jikan = requests.get(url)
         if jikan.status_code == 400:
-            logger.error("Jikan request failed: 400 - Bad Request")
+            logger.error("Jikan 400 -- "+name)
             return False
         jfile = jikan.json()
     except:
-        logger.error("Jikan request failed")
+        logger.error("Jikan request failed -- "+name)
         return False
 
     jikanData = json.loads(json.dumps(jfile))
     if len(jikanData['data']) == 0:
-        logger.error("Jikan search found no entries")
+        logger.error("Jikan search found no entries -- "+name)
         return False
     
     jikanOptions = []
@@ -221,7 +221,7 @@ def jikanSearch(name):
     
     selection = optionSelect(jikanOptions)
     if selection == False:
-        logger.error("Couldn't find title: "+ name)
+        logger.error("Couldn't find title -- "+name)
         return False
     return selection
 
@@ -243,16 +243,16 @@ def malSearch(name):
         url += "&fields="+fields+"&nsfw=true"
         mal = requests.get(url, headers=headers)
         if mal.status_code == 400:
-            logger.error("MAL request failed: 400 - Bad Request")
+            logger.error("MAL 400 -- "+name)
             return False
         malFile = mal.json()
     except:
-        logger.error("MAL request failed")
+        logger.error("MAL request failed -- "+name)
         return False
 
     malData = json.loads(json.dumps(malFile))
     if len(malData['data']) == 0:
-        logger.error("MAL search found no entries")
+        logger.error("MAL search found no entries -- "+name)
         return False
 
     malOptions = []
@@ -272,7 +272,7 @@ def malSearch(name):
     
     selection = optionSelect(malOptions)
     if selection == False:
-        logger.error("Couldn't find title: "+ name)
+        logger.error("Couldn't find title -- "+ name)
         return False
     return selection
 
@@ -328,7 +328,7 @@ def search(name):
     pyperclip.copy(name)
 
     if len(name) < 3:
-        logger.error("Search title too small: " + name)
+        logger.error("Search title too small -- " + name)
         return False
     
     if args.mal_api:
@@ -371,7 +371,8 @@ def main():
 
         name = i['name']
         if badSearch(name, args.bad_file):
-            logger.error("Couldn't find - " + name)
+            logger.error("Bad title -- "+name)
+            notFound += 1
             continue
 
         foundID = cacheSearch(name, args.cache_file)
@@ -379,7 +380,7 @@ def main():
             if args.cache_only:
                 logger.info('CACHE ONLY: Skipping search')
                 notFound += 1
-                logger.error("Couldn't find - " + name)
+                logger.error("Couldn't find title -- "+name)
                 continue
             
             foundID = search(name)
