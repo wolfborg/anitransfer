@@ -30,6 +30,8 @@ DEFAULTS = {
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
+    'mal_api': False,
+    'num_options': 10,
     'limit': -1,
 }
 
@@ -79,9 +81,21 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
+        '--mal-api',
+        help='Uses MAL API instead when doing search (MAL_CLIENT_ID  required in .env file).',
+        default=DEFAULTS['mal_api'],
+        action='store_true'
+    )
+    parser.add_argument(
         '--limit',
         help='Limits the number of entries to process',
         default=DEFAULTS['limit'],
+        type=int
+    )
+    parser.add_argument(
+        '--num-options',
+        help='Determines the max number of options to display during options select.',
+        default=DEFAULTS['num_options'],
         type=int
     )
     parser.add_argument('anime_list')
@@ -161,107 +175,69 @@ def delayCheck(delay):
         time.sleep(diff)
     qtime = datetime.datetime.now()
 
-def optionsCheck(name, jdata):
-    options = []
-    for i in jdata['data']:
-        options.append(str(i['title']).lower())
-    if name.lower() in options:
-        return options.index(name.lower())
-    return False
-
-def jverify(name, jdata):
-    jname = str(jdata['data'][0]['title'])
-    if name.lower() == jname.lower():
-        return [jname, 0]
-
-    found = optionsCheck(name, jdata)
-    if found != False:
-        return [str(jdata['data'][found]['title']), found]
-
-    # print('Found title: ' + jname)
-
-    return displayOptions(jdata)
-
-def displayOptions(jdata):
-    if args.skip_confirm:
-        logger.info('SKIP: Skipping confirmation')
-        return False
-
-    numOptions = 10
-    options = []
-    for i in jdata['data']:
-        options.append(str(i['title']))
-    print()
-    print('[OTHER OPTIONS]')
-    x = 1
-    for entry in jdata['data']:
-        title = str(entry['title'])
-        url = str(entry['url'])
-        options.append(title)
-        print('[' + str(x) + '] ' + title)
-        if args.with_links:
-            print(url)
-            print()
-        if x >= numOptions:
-            break
-        x = x+1
-    print('[i] Manual ID')
-    print('[n] Skip entry')
-    return prompt(options, numOptions)
-
-def prompt(options, numOptions):
-    v2 = input('Enter number for correct choice: ')
-    if v2.strip() == '' or v2.strip() == 'n':
-        return False
-    elif v2.strip() == 'i':
-        malID = input("Enter MAL ID: ")
-        return malID
-    elif v2.isdigit() and int(v2) <= numOptions:
-        return [options[int(v2)-1], int(v2)-1]
-    
-    logger.debug('ERROR: Bad input. Asking again.')
-    return prompt(options, numOptions)
+def jikanGetTitles(entry):
+    titles = [entry['title']]
+    if 'title_english' in entry:
+        titles.append(entry['title_english'])
+    if 'titles' in entry:
+        altTitles = entry['titles']
+        for altTitle in altTitles:
+            titles.append(altTitle)
+    if 'title_synonyms' in entry:
+        for synonyms in entry['title_synonyms']:
+            titles.append(synonyms)
+    return titles
 
 def jikanSearch(name):
     try:
-        jikan = requests.get("https://api.jikan.moe/v4/anime?q="+name)
+        url = "https://api.jikan.moe/v4/anime?q="+name.replace('&','%26amp;')
+        jikan = requests.get(url)
         jfile = jikan.json()
     except:
         logger.error("Jikan request failed")
         return False
 
-    jdata = json.loads(json.dumps(jfile))
-    if len(jdata['data']) == 0:
+    jikanData = json.loads(json.dumps(jfile))
+    if len(jikanData['data']) == 0:
         logger.error("Jikan search found no entries")
         return False
-
-    jver = jverify(name, jdata)
-
-    if jver == False:
-        logger.error("Couldn't find - " + name)
-        return False
-
-    if isinstance(jver, str):
-        return jver
     
-    return [str(jdata['data'][jver[1]]['mal_id']), jver[0]]
+    jikanOptions = []
+    jikanEntries = jikanData['data']
+    for entry in jikanEntries:
+        id = str(entry['mal_id'])
+        link = "https://myanimelist.net/anime/"+id
 
-def malTitlesCheck(name, titles):
-    if name in titles:
-        return True
-    return False
+        titles = jikanGetTitles(entry)
+        if name.lower() in [x.lower() for x in titles]:
+            logger.info("Jikan match found: "+id)
+            return id
 
-def malPrintSearchInfo(id, titles):
-    print("MAL ID: "+id)
-    for a in titles:
-        print(" - "+a)
+        jikanOption = {"id": id, "titles": titles, "link": link}
+        jikanOptions.append(jikanOption)
+    
+    selection = optionSelect(jikanOptions)
+    if selection == False:
+        logger.error("Couldn't find title: "+ name)
+        return False
+    return selection
+
+def malGetTitles(entry):
+    titles = [entry['title']]
+    altTitles = entry['alternative_titles']
+    if 'en' in altTitles:
+        titles.append(altTitles['en'])
+    if 'synonyms' in altTitles:
+        for synonyms in altTitles['synonyms']:
+            titles.append(synonyms)
+    return titles
 
 def malSearch(name):
     try:
         headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
-        url = "https://api.myanimelist.net/v2/anime?q="+name
+        url = "https://api.myanimelist.net/v2/anime?q="+name.replace('&','%26amp;')
         fields = "id,title,alternative_titles,start_date,end_date,media_type,num_episodes,start_season,source,average_episode_duration,studios"
-        url += "&fields="+fields+"&limit=5"
+        url += "&fields="+fields
         mal = requests.get(url, headers=headers)
         malFile = mal.json()
     except:
@@ -269,34 +245,75 @@ def malSearch(name):
         return False
 
     malData = json.loads(json.dumps(malFile))
+    if len(malData['data']) == 0:
+        logger.error("MAL search found no entries")
+        return False
+
+    malOptions = []
     malEntries = malData['data']
     for entry in malEntries:
-        node = entry['node']
-        id = str(node['id'])
+        entry = entry['node']
+        id = str(entry['id'])
         link = "https://myanimelist.net/anime/"+id
-        title = node['title']
-
-        titles = []
-        alt_titles = node['alternative_titles']
-
-        if 'en' in alt_titles:
-            titles.append(alt_titles['en'])
-        titles.append(title)
-
-        if 'synonyms' in alt_titles:
-            for synonyms in alt_titles['synonyms']:
-                titles.append(synonyms)
-
-        titleCheck = malTitlesCheck(name, titles)
-        if titleCheck:
-            logger.info("MAL Match Found: "+id)
+ 
+        titles = malGetTitles(entry)
+        if name.lower() in [x.lower() for x in titles]:
+            logger.info("MAL match found: "+id)
             return id
 
-        malPrintSearchInfo(id, titles)
+        malOption = {"id": id, "titles": titles, "link": link}
+        malOptions.append(malOption)
+    
+    selection = optionSelect(malOptions)
+    if selection == False:
+        logger.error("Couldn't find title: "+ name)
+        return False
+    return selection
+
+def printOptionInfo(id, titles, link):
+    print("MAL ID: "+id)
+    for title in titles:
+        print(" - "+title)
+    if args.with_links:
+        print(link)
+    print()
+
+def prompt(options, numOptions):
+    answer = input('Enter number for correct choice: ')
+    if answer.strip() == '':
+        return False
+    elif answer.strip() == 'i':
+        malID = input("Enter MAL ID: ")
+        return malID
+    elif answer.isdigit() and int(answer) <= numOptions:
+        answer = int(answer)-1
+        return options[answer]['id']
+    logger.debug('ERROR: Bad input. Asking again.')
+    return prompt(options, numOptions)
+
+def optionSelect(options):
+    if args.skip_confirm:
+        logger.info('SKIP: Skipping confirmation')
+        return False
+
+    numOptions = args.num_options
+    print()
+    print('[OPTIONS]')
+    x = 1
+    for option in options:
+        title = option['titles'][0]
+        link = option['link']
+        print('[' + str(x) + '] ' + title)
+        # printOptionInfo(id, titles, link)
         if args.with_links:
             print(link)
-        print()
-    return False
+            print()
+        if x >= numOptions:
+            break
+        x = x+1
+    print('[i] Manual ID')
+    print('[ENTER] Skip entry')
+    return prompt(options, numOptions)
 
 def search(name):
     print()
@@ -304,17 +321,19 @@ def search(name):
     pyperclip.copy(name)
 
     if len(name) < 3:
-        logger.error("Search title too small - " + name)
+        logger.error("Search title too small: " + name)
         return False
     
-    name = name.replace('&','and')
+    if args.mal_api:
+        malResult = malSearch(name)
+        if malResult:
+            return malResult
+        return False
 
-    malResult = malSearch(name)
-    if malResult:
-        return malResult
-
-    jikanResults = jikanSearch(name)
-    return jikanResults
+    jikanResult = jikanSearch(name)
+    if jikanResult:
+        return jikanResult
+    return False
 
 def main():
     #Start MAL XML structure
@@ -337,15 +356,15 @@ def main():
             break
 
         cached = False
-        count = count + 1
+        count += 1
 
         name = i['name']
         if badSearch(name, args.bad_file):
             logger.error("Couldn't find - " + name)
             continue
 
-        entryid = cacheSearch(name, args.cache_file)
-        if entryid == False:
+        foundID = cacheSearch(name, args.cache_file)
+        if foundID == False:
             if args.cache_only:
                 logger.info('CACHE ONLY: Skipping search')
                 notFound += 1
@@ -353,17 +372,14 @@ def main():
                 continue
             
             print('==============')
-            mal = search(name)
-            if mal == False:
-                delayCheck(args.api_delay)
+            foundID = search(name)
+            if foundID == False:
                 notFound += 1
+                delayCheck(args.api_delay)
                 continue
             else:
-                if isinstance(mal, str) == False:
-                    mal = mal[0]
-                cache(i['name'], mal, args.cache_file)
-                entryid = mal
                 searchFound += 1
+                cache(name, foundID, args.cache_file)
         else:
             cached = True
             cacheFound += 1
@@ -388,7 +404,7 @@ def main():
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
 
-        malid.text = entryid
+        malid.text = foundID
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
@@ -410,9 +426,7 @@ def main():
 
         #MUST use 4 second delay for API rate limits
         if cached == False:
-            name = i['name']
-            jname = mal[1]
-            strlog = str(count) + ": " + name + " ---> " + jname
+            strlog = str(count) + ": " + name + " ---> " + foundID
             logger.info("Adding to cache: "+strlog)
             delayCheck(args.api_delay)
 
