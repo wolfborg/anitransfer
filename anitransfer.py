@@ -193,7 +193,7 @@ def jikanSearch(name):
         url = "https://api.jikan.moe/v4/anime?q="+name.replace('&','%26amp;')
         jikan = requests.get(url)
         if jikan.status_code == 400:
-            logger.error("Jikan request failed")
+            logger.error("Jikan request failed: 400 - Bad Request")
             return False
         jfile = jikan.json()
     except:
@@ -243,7 +243,7 @@ def malSearch(name):
         url += "&fields="+fields
         mal = requests.get(url, headers=headers)
         if mal.status_code == 400:
-            logger.error("MAL request failed")
+            logger.error("MAL request failed: 400 - Bad Request")
             return False
         malFile = mal.json()
     except:
