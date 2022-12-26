@@ -323,6 +323,7 @@ def optionSelect(options):
 
 def search(name):
     print()
+    print('==============')
     logger.info('Anime Planet title: ' + name)
     pyperclip.copy(name)
 
@@ -332,11 +333,15 @@ def search(name):
     
     if args.mal_api:
         malResult = malSearch(name)
+        print('==============')
+        print()
         if malResult:
             return malResult
         return False
 
     jikanResult = jikanSearch(name)
+    print('==============')
+    print()
     if jikanResult:
         return jikanResult
     return False
@@ -377,7 +382,6 @@ def main():
                 logger.error("Couldn't find - " + name)
                 continue
             
-            print('==============')
             foundID = search(name)
             if foundID == False:
                 notFound += 1
