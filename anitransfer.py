@@ -240,7 +240,7 @@ def malSearch(name):
         headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
         url = "https://api.myanimelist.net/v2/anime?q="+name.replace('&','%26amp;')
         fields = "id,title,alternative_titles,start_date,end_date,media_type,num_episodes,start_season,source,average_episode_duration,studios"
-        url += "&fields="+fields
+        url += "&fields="+fields+"&nsfw=true"
         mal = requests.get(url, headers=headers)
         if mal.status_code == 400:
             logger.error("MAL request failed: 400 - Bad Request")
