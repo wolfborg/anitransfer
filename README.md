@@ -74,4 +74,4 @@ Some shows cannot work during this process because an accurate mapping is not po
 
 When the script is done, a log file will be created in the logs folder listing all the shows it couldn't add to the XML file so you can deal with them manually on AniList after importing. If you import to AniList, the site might also list a few titles it has a problem importing that you might have to manually fix or they just don't exist in the AniList database.
 
-If you want me to process your list for you, reach out to me on [Twitter](https://twitter.com/Wolfborgg) or via [email](mailto:chaplin.derek@gmail.com). And if you use the script, I would appreciate if you send me the cache file after so I can add the new mappings to the script.
+If you want me to process your list for you, reach out to me on [Twitter](https://twitter.com/Wolfborgg) or via email ([chaplin.derek@gmail.com](mailto:chaplin.derek@gmail.com)). And if you use the script, I would appreciate if you send me the cache file after so I can add the new mappings to the script.
