@@ -12,16 +12,26 @@ import time
 import requests
 import logging
 from datetime import date
-import sys
+import sys, os
+import pyperclip
+from dotenv import load_dotenv
+
+sys.stdout.reconfigure(encoding='utf-8')
+
+load_dotenv()
+
+MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'jikan_delay': 4, # in seconds
+    'api_delay': 1.5, # in seconds
     'log_file': f'logs/anitransfer_{datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")}.txt',
     'cache_file': 'cache.csv',
     'bad_file': 'bad.csv',
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
+    'mal_api': False,
+    'num_options': 10,
     'limit': -1,
 }
 
@@ -32,9 +42,9 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        '--jikan-delay',
-        help='Delay between API requests to Jikan in seconds',
-        default=DEFAULTS['jikan_delay'],
+        '--api-delay',
+        help='Delay between API requests in seconds',
+        default=DEFAULTS['api_delay'],
         type=int
     )
     parser.add_argument(
@@ -71,9 +81,21 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
+        '--mal-api',
+        help='Uses MAL API instead when doing search (MAL_CLIENT_ID  required in .env file).',
+        default=DEFAULTS['mal_api'],
+        action='store_true'
+    )
+    parser.add_argument(
         '--limit',
         help='Limits the number of entries to process',
         default=DEFAULTS['limit'],
+        type=int
+    )
+    parser.add_argument(
+        '--num-options',
+        help='Determines the max number of options to display during options select.',
+        default=DEFAULTS['num_options'],
         type=int
     )
     parser.add_argument('anime_list')
@@ -89,7 +111,7 @@ def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
     logger.setLevel(logging.DEBUG)
 
     consoleHandler = logging.StreamHandler(sys.stdout)
-    fileHandler = logging.FileHandler(LOG_FILE_NAME)
+    fileHandler = logging.FileHandler(filename=LOG_FILE_NAME, mode='w', encoding='utf-8')
     consoleHandler.setLevel(logging.DEBUG)
     fileHandler.setLevel(logging.WARNING)
     
@@ -153,101 +175,181 @@ def delayCheck(delay):
         time.sleep(diff)
     qtime = datetime.datetime.now()
 
-def optionsCheck(name, jdata):
-    options = []
-    for i in jdata['data']:
-        options.append(str(i['title']).lower())
-    if name.lower() in options:
-        return options.index(name.lower())
-    return False
+def jikanGetTitles(entry):
+    titles = [entry['title']]
+    if 'title_english' in entry and entry['title_english'] != None:
+        titles.append(entry['title_english'])
+    if 'titles' in entry:
+        altTitles = entry['titles']
+        for altTitle in altTitles:
+            if altTitle['type'] == 'English':
+                titles.append(altTitle['title'])
+    if 'title_synonyms' in entry:
+        for synonyms in entry['title_synonyms']:
+            titles.append(synonyms)
+    return titles
 
-def jverify(name, jdata):
-    jname = str(jdata['data'][0]['title'])
-    if name.lower() == jname.lower():
-        return [jname, 0]
+def jikanSearch(name):
+    try:
+        url = "https://api.jikan.moe/v4/anime?q="+name.replace('&','%26amp;')
+        jikan = requests.get(url)
+        if jikan.status_code == 400:
+            logger.error("Jikan 400 -- "+name)
+            return False
+        jfile = jikan.json()
+    except:
+        logger.error("Jikan request failed -- "+name)
+        return False
 
-    found = optionsCheck(name, jdata)
-    if found != False:
-        return [str(jdata['data'][found]['title']), found]
+    jikanData = json.loads(json.dumps(jfile))
+    if len(jikanData['data']) == 0:
+        logger.error("Jikan search found no entries -- "+name)
+        return False
+    
+    jikanOptions = []
+    jikanEntries = jikanData['data']
+    for entry in jikanEntries:
+        id = str(entry['mal_id'])
+        link = "https://myanimelist.net/anime/"+id
 
-    # print('Found title: ' + jname)
+        titles = jikanGetTitles(entry)
+        if name.lower() in [x.lower() for x in titles]:
+            logger.info("Jikan match found: "+id)
+            return id
 
-    return displayOptions(jdata)
+        jikanOption = {"id": id, "titles": titles, "link": link}
+        jikanOptions.append(jikanOption)
+    
+    selection = optionSelect(jikanOptions)
+    if selection == False:
+        logger.error("Couldn't find title -- "+name)
+        return False
+    return selection
 
-def displayOptions(jdata):
+def malGetTitles(entry):
+    titles = [entry['title']]
+    altTitles = entry['alternative_titles']
+    if 'en' in altTitles:
+        titles.append(altTitles['en'])
+    if 'synonyms' in altTitles:
+        for synonyms in altTitles['synonyms']:
+            titles.append(synonyms)
+    return titles
+
+def malSearch(name):
+    try:
+        headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
+        url = "https://api.myanimelist.net/v2/anime?q="+name.replace('&','%26amp;')
+        fields = "id,title,alternative_titles,start_date,end_date,media_type,num_episodes,start_season,source,average_episode_duration,studios"
+        url += "&fields="+fields+"&nsfw=true"
+        mal = requests.get(url, headers=headers)
+        if mal.status_code == 400:
+            logger.error("MAL 400 -- "+name)
+            return False
+        malFile = mal.json()
+    except:
+        logger.error("MAL request failed -- "+name)
+        return False
+
+    malData = json.loads(json.dumps(malFile))
+    if len(malData['data']) == 0:
+        logger.error("MAL search found no entries -- "+name)
+        return False
+
+    malOptions = []
+    malEntries = malData['data']
+    for entry in malEntries:
+        entry = entry['node']
+        id = str(entry['id'])
+        link = "https://myanimelist.net/anime/"+id
+ 
+        titles = malGetTitles(entry)
+        if name.lower() in [x.lower() for x in titles]:
+            logger.info("MAL match found: "+id)
+            return id
+
+        malOption = {"id": id, "titles": titles, "link": link}
+        malOptions.append(malOption)
+    
+    selection = optionSelect(malOptions)
+    if selection == False:
+        logger.error("Couldn't find title -- "+ name)
+        return False
+    return selection
+
+def printOptionInfo(id, titles, link):
+    print("MAL ID: "+id)
+    for title in titles:
+        print(" - "+title)
+    if args.with_links:
+        print(link)
+    print()
+
+def prompt(options, numOptions):
+    answer = input('Enter number for correct choice: ')
+    if answer.strip() == '':
+        return False
+    elif answer.strip() == 'i':
+        malID = input("Enter MAL ID: ")
+        return malID
+    elif answer.isdigit() and int(answer) <= numOptions:
+        answer = int(answer)-1
+        return options[answer]['id']
+    logger.debug('ERROR: Bad input. Asking again.')
+    return prompt(options, numOptions)
+
+def optionSelect(options):
     if args.skip_confirm:
         logger.info('SKIP: Skipping confirmation')
         return False
 
-    numOptions = 10
-    options = []
-    for i in jdata['data']:
-        options.append(str(i['title']))
+    numOptions = args.num_options
     print()
-    print('[OTHER OPTIONS]')
+    print('[OPTIONS]')
     x = 1
-    for entry in jdata['data']:
-        title = str(entry['title'])
-        url = str(entry['url'])
-        options.append(title)
+    for option in options:
+        title = option['titles'][0]
+        link = option['link']
         print('[' + str(x) + '] ' + title)
+        # printOptionInfo(id, titles, link)
         if args.with_links:
-            print(url)
+            print(link)
             print()
         if x >= numOptions:
             break
         x = x+1
     print('[i] Manual ID')
-    print('[n] Skip entry')
+    print('[ENTER] Skip entry')
     return prompt(options, numOptions)
 
-def prompt(options, numOptions):
-    v2 = input('Enter number for correct choice: ')
-    if v2.strip() == '' or v2.strip() == 'n':
-        return False
-    elif v2.strip() == 'i':
-        malID = input("Enter MAL ID: ")
-        return malID
-    elif v2.isdigit() and int(v2) <= numOptions:
-        return [options[int(v2)-1], int(v2)-1]
-    
-    logger.debug('ERROR: Bad input. Asking again.')
-    return prompt(options, numOptions)
-
-def malSearch(name):
+def search(name):
     print()
-    logger.info('Initial title: ' + name)
+    print('==============')
+    logger.info('Anime Planet title: ' + name)
+    pyperclip.copy(name)
 
     if len(name) < 3:
-        logger.error("Search title too small - " + name)
+        logger.error("Search title too small -- " + name)
         return False
 
-    rname = name.replace('&','and')
+    if args.mal_api:
+        if len(name) >= 65:
+            logger.error("Search title too long -- " + name)
+            return False
 
-    try:
-        jikan = requests.get("https://api.jikan.moe/v4/anime?q="+rname)
-        jfile = jikan.json()
-    except:
-        logger.error("Jikan request failed")
+        malResult = malSearch(name)
+        print('==============')
+        print()
+        if malResult:
+            return malResult
         return False
 
-    jdata = json.loads(json.dumps(jfile))
-    if len(jdata['data']) == 0:
-        logger.error("Jikan search found no entries")
-        return False
-
-    jver = jverify(name, jdata)
-
-    if jver == False:
-        logger.error("Couldn't find - " + name)
-        return False
-
-    if isinstance(jver, str):
-        return jver
-
-    return [str(jdata['data'][jver[1]]['mal_id']), jver[0]]
-
-
+    jikanResult = jikanSearch(name)
+    print('==============')
+    print()
+    if jikanResult:
+        return jikanResult
+    return False
 
 def main():
     #Start MAL XML structure
@@ -270,33 +372,30 @@ def main():
             break
 
         cached = False
-        count = count + 1
+        count += 1
 
         name = i['name']
         if badSearch(name, args.bad_file):
-            logger.error("Couldn't find - " + name)
+            logger.error("Bad title -- "+name)
+            notFound += 1
             continue
 
-        entryid = cacheSearch(name, args.cache_file)
-        if entryid == False:
+        foundID = cacheSearch(name, args.cache_file)
+        if foundID == False:
             if args.cache_only:
-                logger.info('CACHE ONLY: Skipping Jikan search')
+                logger.info('CACHE ONLY: Skipping search')
                 notFound += 1
-                logger.error("Couldn't find - " + name)
+                logger.error("Couldn't find title -- "+name)
                 continue
             
-            print('==============')
-            mal = malSearch(name)
-            if mal == False:
-                delayCheck(args.jikan_delay)
+            foundID = search(name)
+            if foundID == False:
                 notFound += 1
+                delayCheck(args.api_delay)
                 continue
             else:
-                if isinstance(mal, str) == False:
-                    mal = mal[0]
-                cache(i['name'], mal, args.cache_file)
-                entryid = mal
                 searchFound += 1
+                cache(name, foundID, args.cache_file)
         else:
             cached = True
             cacheFound += 1
@@ -321,7 +420,7 @@ def main():
         status = ET.SubElement(entry, 'my_status')
         twatched = ET.SubElement(entry, 'my_times_watched')
 
-        malid.text = entryid
+        malid.text = foundID
         title.text = name
         status.text = stat
         weps.text = str(i['eps'])
@@ -341,13 +440,11 @@ def main():
         if (i['times'] > 1):
             twatched.text = str(i['times']-1)
 
-        #MUST use 4 second delay for Jikan's rate limit
+        #MUST use 4 second delay for API rate limits
         if cached == False:
-            name = i['name']
-            jname = mal[1]
-            strlog = str(count) + ": " + name + " ---> " + jname
+            strlog = str(count) + ": " + name + " ---> " + foundID
             logger.info("Adding to cache: "+strlog)
-            delayCheck(args.jikan_delay)
+            delayCheck(args.api_delay)
 
     total.text = str(cacheFound + searchFound)
 
