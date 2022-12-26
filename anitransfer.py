@@ -209,12 +209,10 @@ def jikanSearch(name):
     jikanOptions = []
     jikanEntries = jikanData['data']
     for entry in jikanEntries:
-        # print(entry)
         id = str(entry['mal_id'])
         link = "https://myanimelist.net/anime/"+id
 
         titles = jikanGetTitles(entry)
-        print(titles)
         if name.lower() in [x.lower() for x in titles]:
             logger.info("Jikan match found: "+id)
             return id
