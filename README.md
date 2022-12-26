@@ -17,6 +17,8 @@ poetry run anitransfer.py path/to/your/file.json
 poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
 ```
 
+When it's done running, a file called "convert.xml" will be in the folder. Use this to import your list.
+
 If you would like to see a full list of available options, run `poetry run anitransfer.py --help`.
 
 ## MAL API
