@@ -331,8 +331,12 @@ def search(name):
     if len(name) < 3:
         logger.error("Search title too small -- " + name)
         return False
-    
+
     if args.mal_api:
+        if len(name) >= 65:
+            logger.error("Search title too long -- " + name)
+            return False
+
         malResult = malSearch(name)
         print('==============')
         print()
