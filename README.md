@@ -76,7 +76,7 @@ https://myanimelist.net/apiconfig/references/api/v2
 
 `--cache-file`: (path) Cache file to use for already downloaded anime mappings.
 
-`--bad-file'`: (path) Cache file to use for incompatible anime mappings.
+`--bad-file`: (path) Cache file to use for incompatible anime mappings.
 
 Typically I run the script with `--cache-only` first then run it with `--mal-api --skip-confirm` once. After that, I run it with `--mal-api --with-links` and manually confirm the entries are correct between Anime Planet and MyAnimeList (the Anime Planet title is automatically added to your clipboard too). And then I do a final run with `--cache-only` and review the log file for any issues that might have to be fixed after importing to AniList.
 
