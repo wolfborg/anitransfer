@@ -10,16 +10,16 @@ poetry install
 
 Run the conversion.
 ```bash
-poetry run anitransfer.py path/to/your/file.json
+poetry run python anitransfer.py path/to/your/file.json
 ```
 
 ```bash
-poetry run anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
+poetry run python anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
 ```
 
 When it's done running, a file called "convert.xml" will be in the folder. Use this to import your list.
 
-If you would like to see a full list of available options, run `poetry run anitransfer.py --help`.
+If you would like to see a full list of available options, run `poetry run python anitransfer.py --help`.
 
 ## MAL API
 In order to convert lists, you need to match Anime Planet titles to MyAnimeList IDs. This script has two APIs which can accomplish this. The original Jikan API this script relied on changed to v4 recently and right now its search queries are really bad. So for now it's recommended to use the MyAnimeList API instead with this script.
