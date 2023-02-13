@@ -59,16 +59,23 @@ https://myanimelist.net/apiconfig/references/api/v2
 
 ## Optional Arguments
 `--cache-only`: Runs process without looking up new matches, only cache mappings used.
+
 `--mal-api`: Uses MAL API instead when doing search (MAL_CLIENT_ID  required in .env file).
+
 `--skip-confirm`: Skip any confirmation prompts that show up, still tries initial search for entries.
+
 `--with-links`: Displays links to found MyAnimeList entries to help with manual confirmation.
+
 `--num-options`: (int) Determines the max number of options to display during options select.
+
 `--limit`: (int) Limits the number of entries to process.
+
 `--api-delay`: (int) Delay between API requests in seconds.
 
-Custom files
 `--log-file`: (path) Write log of operations to this file.
+
 `--cache-file`: (path) Cache file to use for already downloaded anime mappings.
+
 `--bad-file'`: (path) Cache file to use for incompatible anime mappings.
 
 Typically I run the script with `--cache-only` first then run it with `--mal-api --skip-confirm` once. After that, I run it with `--mal-api --with-links` and manually confirm the entries are correct between Anime Planet and MyAnimeList (the Anime Planet title is automatically added to your clipboard too). And then I do a final run with `--cache-only` and review the log file for any issues that might have to be fixed after importing to AniList.
