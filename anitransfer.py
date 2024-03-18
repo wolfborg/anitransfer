@@ -238,7 +238,7 @@ def malGetTitles(entry):
             titles.append(synonyms)
     return titles
 
-def malSearch(name):
+def malSearch(name, assume_match=True):
     try:
         headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
         url = "https://api.myanimelist.net/v2/anime?q="+name.replace('&','%26amp;')
@@ -266,9 +266,10 @@ def malSearch(name):
         link = "https://myanimelist.net/anime/"+id
  
         titles = malGetTitles(entry)
-        if name.lower() in [x.lower() for x in titles]:
-            logger.info("MAL match found: "+id)
-            return id
+        if assume_match:
+            if name.lower() in [x.lower() for x in titles]:
+                logger.info("MAL match found: "+id)
+                return id
 
         malOption = {"id": id, "titles": titles, "link": link}
         malOptions.append(malOption)
@@ -335,11 +336,14 @@ def search(name):
         return False
 
     if args.mal_api:
-        if len(name) >= 65:
-            logger.error("Search title too long -- " + name)
-            return False
+        assume_match = True
 
-        malResult = malSearch(name)
+        if len(name) >= 65:
+            name = name[:64]
+            logger.info("Search title too long, shortening: -- " + name)
+            assume_match = False
+
+        malResult = malSearch(name, assume_match)
         print('==============')
         print()
         if malResult:
