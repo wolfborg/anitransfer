@@ -38,11 +38,11 @@ Replace `clientid` with your client ID. Do not let others see this ID.
 After that, you'll be able to run the script with the new `--mal-api` option. Without this, it will default to using the Jikan API search.
 
 ```bash
-poetry run anitransfer.py path/to/your/file.json --mal-api
+poetry run python anitransfer.py path/to/your/file.json --mal-api
 ```
 
 ```bash
-poetry run anitransfer.py ~/Downloads/export-anime-Wolfborg.json --mal-api
+poetry run python anitransfer.py samples/export-anime-Wolfborg.json --mal-api
 ```
 
 Keep in mind the API currently does not have a publicly defined rate limit, but it's probably best to keep a delay on each request. The default API delay (for MAL and Jikan) is currently set to 1.5 seconds. This will only trigger a delay when an API request is actually done.
@@ -79,6 +79,13 @@ https://myanimelist.net/apiconfig/references/api/v2
 `--bad-file`: (path) Cache file to use for incompatible anime mappings.
 
 Typically I run the script with `--cache-only` first then run it with `--mal-api --skip-confirm` once. After that, I run it with `--mal-api --with-links` and manually confirm the entries are correct between Anime Planet and MyAnimeList (the Anime Planet title is automatically added to your clipboard too). And then I do a final run with `--cache-only` and review the log file for any issues that might have to be fixed after importing to AniList.
+
+```bash
+poetry run python anitransfer.py samples/export-anime-Wolfborg.json --cache-only
+poetry run python anitransfer.py samples/export-anime-Wolfborg.json --mal-api --skip-confirm
+poetry run python anitransfer.py samples/export-anime-Wolfborg.json --mal-api --with-links
+poetry run python anitransfer.py samples/export-anime-Wolfborg.json --cache-only
+```
 
 ## Summary
 The goal of this script is to move your anime list from Anime Planet to AniList, although it also works for MyAnimeList.
