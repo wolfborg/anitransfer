@@ -131,7 +131,7 @@ logger = setupLogger(args.log_file)
 
 #Loads JSON file
 def loadJSON(filename):
-    f = open(filename)
+    f = open(filename, encoding='utf-8')
     data = json.load(f)
     f.close()
     return data
