@@ -14,7 +14,9 @@ import logging
 from datetime import date
 import sys, os
 import pyperclip
+import webbrowser
 from dotenv import load_dotenv
+import urllib.parse
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -198,7 +200,8 @@ def jikanGetTitles(entry):
 
 def jikanSearch(name):
     try:
-        url = "https://api.jikan.moe/v4/manga?q="+name.replace('&','%26amp;')
+        query = urllib.parse.quote_plus(str(name))
+        url = "https://api.jikan.moe/v4/manga?q="+query
         jikan = requests.get(url)
         if jikan.status_code == 400:
             logger.error("Jikan 400 -- "+name)
@@ -243,10 +246,18 @@ def malGetTitles(entry):
             titles.append(synonyms)
     return titles
 
-def malSearch(name, assume_match=True):
+def malSearch(full_name, assume_match=True):
+    name = full_name
+
+    if len(name) >= 65:
+        name = name[:64]
+        logger.info("Search title too long, shortening: -- " + name)
+        assume_match = False
+
     try:
         headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
-        url = "https://api.myanimelist.net/v2/manga?q="+name.replace('&','%26amp;')
+        query = urllib.parse.quote_plus(str(name))
+        url = "https://api.myanimelist.net/v2/manga?q="+query
         fields = "id,title,alternative_titles,start_date,end_date,media_type,num_volumes,num_chapters"
         url += "&fields="+fields+"&nsfw=true"
         mal = requests.get(url, headers=headers)
@@ -279,11 +290,35 @@ def malSearch(name, assume_match=True):
         malOption = {"id": id, "titles": titles, "link": link}
         malOptions.append(malOption)
     
-    selection = optionSelect(malOptions, name)
+    selection = optionSelect(malOptions, full_name)
     if selection == False:
-        logger.error("Couldn't find title -- "+ name)
+        logger.error("Couldn't find title -- "+ full_name)
         return False
     return selection
+
+def getMALChapters(mal_id):
+    num_chapters = 0
+
+    try:
+        headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
+        url = "https://api.myanimelist.net/v2/manga/"+mal_id
+        fields = "num_volumes,num_chapters"
+        url += "?fields="+fields+"&nsfw=true"
+        mal = requests.get(url, headers=headers)
+        if mal.status_code == 400:
+            logger.error("MAL 400 -- "+mal_id)
+            return False
+        malFile = mal.json()
+    except:
+        logger.error("MAL request failed -- "+mal_id)
+        return False
+    
+
+    malData = json.loads(json.dumps(malFile))
+    num_chapters = malData['num_chapters']
+    # num_volumes = malData['num_volumes']
+    
+    return num_chapters
 
 def printOptionInfo(id, titles, link):
     print("MAL ID: "+id)
@@ -332,27 +367,20 @@ def optionSelect(options, name):
     print('[i] Manual ID')
     print('[b] Mark as bad entry')
     print('[ENTER] Skip entry')
+    getConfirmInfo(name)
     return prompt(options, numOptions, name)
 
 def search(name):
     print()
     print('==============')
     logger.info('Anime Planet title: ' + name)
-    pyperclip.copy(name)
 
     if len(name) < 3:
         logger.error("Search title too small -- " + name)
         return False
 
     if args.mal_api:
-        assume_match = True
-
-        if len(name) >= 65:
-            name = name[:64]
-            logger.info("Search title too long, shortening: -- " + name)
-            assume_match = False
-
-        malResult = malSearch(name, assume_match)
+        malResult = malSearch(name)
         print('==============')
         print()
         if malResult:
@@ -360,11 +388,20 @@ def search(name):
         return False
 
     jikanResult = jikanSearch(name)
+
     print('==============')
     print()
     if jikanResult:
         return jikanResult
     return False
+
+def getConfirmInfo(name):
+    #pyperclip.copy(name)
+    query = urllib.parse.quote_plus(str(name))
+    mal_url = "https://myanimelist.net/manga.php?cat=manga&q="+query[:99]
+    webbrowser.open(mal_url, new=2, autoraise=True)
+    planet_url = "https://www.anime-planet.com/manga/all?name="+query
+    webbrowser.open(planet_url, new=2, autoraise=True)
 
 def main():
     #Start MAL XML structure
@@ -378,8 +415,10 @@ def main():
 
     count = 0
     cacheFound = 0
+    badFound = 0
     searchFound = 0
     notFound = 0
+
     for i in data['entries']:
         #Use this for smaller tests
         limit = args.limit
@@ -392,7 +431,7 @@ def main():
         name = i['name']
         if badSearch(name, args.bad_file):
             logger.error("Bad title -- "+name)
-            notFound += 1
+            badFound += 1
             continue
 
         foundID = cacheSearch(name, args.cache_file)
@@ -444,6 +483,10 @@ def main():
         read_volumes.text = str(i['vol'])
         read_chapters.text = str(i['ch'])
 
+        if stat == "Completed":
+            read_chapters.text = str(getMALChapters(foundID))
+            delayCheck(args.api_delay)
+
         start_date.text = "0000-00-00"
         finish_date.text = "0000-00-00"
         score.text = str(int(i['rating']*2))
@@ -472,6 +515,7 @@ def main():
     print("=================================")
     logger.info("Total Entries: "+str(len(data['entries'])))
     logger.info("Cache Found: "+str(cacheFound))
+    logger.info("Bad Found: "+str(badFound))
     logger.info("Search Found: "+str(searchFound))
     logger.info("Not Found: "+str(notFound))
 
