@@ -460,7 +460,7 @@ def searchEntries(entries, root):
     return foundEntries
 
 def processConfirm():
-    answer = input("Would you like to process all entries? (y/n): ")
+    answer = input("Would you like to process not found entries? (y/n): ")
     if answer.strip().lower() == "y":
         return True
     elif answer.strip().lower() == "n":
@@ -525,12 +525,14 @@ def processList():
 
     cachedEntries, notFoundEntries, badEntries = getInitialCounts(data, root)
 
-    if processConfirm() == False:
-        logger.info("Ending program without processing, list not converted")
-        return
+    skipSearch = False
+    if args.cache_only or processConfirm() == False:
+        skipSearch = True
+        logger.info("Skipping search, processing cache-only converted list...")
 
     foundEntries = []
-    if args.cache_only == False:
+
+    if skipSearch == False:
         foundEntries = searchEntries(notFoundEntries, root)
 
     totalCount = len(data['entries'])
