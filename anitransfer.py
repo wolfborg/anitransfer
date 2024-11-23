@@ -166,6 +166,11 @@ def badSearch(name, bad_file):
             return True
     return False
 
+def bad(name, bad_file):
+    with open(bad_file, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow([name])
+
 qtime = datetime.datetime.now()
 
 def delayCheck(delay):
