@@ -150,7 +150,7 @@ def cacheSearch(name, cache_file):
     for i in data:
         if i[0] == name:
             mal = i[1]
-            logger.info('Cached ID found: ' + name + ' ---> ' + mal)
+            #logger.info('Cached ID found: ' + name + ' ---> ' + mal)
             return mal
     #print('Cached Not found.')
     return False
@@ -162,7 +162,7 @@ def badSearch(name, bad_file):
 
     for i in data:
         if i[0] == name:
-            logger.info('Bad title found: ' + name + ' ---> SKIP')
+            #logger.info('Bad title found: ' + name + ' ---> SKIP')
             return True
     return False
 
@@ -378,103 +378,166 @@ def getConfirmInfo(name):
     planet_url = "https://www.anime-planet.com/anime/all?name="+query
     webbrowser.open(planet_url, new=2, autoraise=True)
 
-
-def main():
-    #Start MAL XML structure
-    root = ET.Element('myanimelist')
-    info = ET.SubElement(root, 'myinfo')
-    uname = ET.SubElement(info, 'user_name')
-    total = ET.SubElement(info, 'user_total_anime')
-
-    data = loadJSON(args.anime_list)
-    uname.text = data['user']['name']
-
-    count = 0
+def getInitialCounts(data, root):
     cacheFound = 0
     badFound = 0
-    searchFound = 0
     notFound = 0
 
-    for i in data['entries']:
+    cachedEntries = []
+    notFoundEntries = []
+    badEntries = []
+
+    for entry in data['entries']:
+        name = entry['name']
+        
+        if badSearch(name, args.bad_file):
+            badFound += 1
+            badEntries.append(entry)
+            logger.error("Bad title -- "+name)
+            logger.info('Bad title found: ' + name + ' ---> SKIP')
+            continue
+
+        foundID = cacheSearch(name, args.cache_file)
+        if foundID != False:
+            cacheFound += 1
+            cachedEntries.append(entry)
+            logger.info('Cached ID found: ' + name + ' ---> ' + foundID)
+            
+            convertEntry(entry, foundID, root)
+            continue
+        
+        notFound += 1
+        notFoundEntries.append(entry)
+    
+    print("=================================")
+    print("Total Entries: "+str(len(data['entries'])))
+    print("Cache Found: "+str(cacheFound))
+    print("Bad Found: "+str(badFound))
+    print("Not Found: "+str(notFound))
+
+    return (cachedEntries, notFoundEntries, badEntries)
+
+def searchEntries(entries, root):
+    count = 0
+    found = 0
+    notFound = 0
+
+    foundEntries = []
+    notFoundEntries = []
+
+    for entry in entries:
         #Use this for smaller tests
         limit = args.limit
         if limit > -1 and count >= limit:
             break
 
-        cached = False
+        foundID = False
         count += 1
+        
+        name = entry['name']
+        foundID = search(name)
 
-        name = i['name']
-        if badSearch(name, args.bad_file):
-            logger.error("Bad title -- "+name)
-            badFound += 1
+        if foundID == False:
+            notFound += 1
+            notFoundEntries.append(entry)
+            #MUST use 4 second delay for API rate limits
+            delayCheck(args.api_delay)
             continue
 
-        foundID = cacheSearch(name, args.cache_file)
-        if foundID == False:
-            if args.cache_only:
-                logger.info('CACHE ONLY: Skipping search')
-                notFound += 1
-                logger.error("Couldn't find title -- "+name)
-                continue
-            
-            foundID = search(name)
-            if foundID == False:
-                notFound += 1
-                delayCheck(args.api_delay)
-                continue
-            else:
-                searchFound += 1
-                cache(name, foundID, args.cache_file)
-        else:
-            cached = True
-            cacheFound += 1
+        found += 1
 
-        #Convert status
-        stat = i['status']
-        if stat == 'watched': stat = 'Completed'
-        elif stat == 'watching': stat = 'Watching'
-        elif stat == 'want to watch': stat = 'Plan to Watch'
-        elif stat == 'stalled': stat = 'On-Hold'
-        elif stat == 'dropped': stat = 'Dropped'
-        elif stat == "won't watch": continue
+        foundEntries.append(foundID)
+        cache(name, foundID, args.cache_file)
 
-        #Populate anime XML entry
-        entry = ET.SubElement(root, 'anime')
-        malid = ET.SubElement(entry, 'series_animedb_id')
-        title = ET.SubElement(entry, 'series_title')
-        weps = ET.SubElement(entry, 'my_watched_episodes')
-        wsd = ET.SubElement(entry, 'my_start_date')
-        wfd = ET.SubElement(entry, 'my_finish_date')
-        score = ET.SubElement(entry, 'my_score')
-        status = ET.SubElement(entry, 'my_status')
-        twatched = ET.SubElement(entry, 'my_times_watched')
+        convertEntry(entry, foundID, root)
 
-        malid.text = foundID
-        title.text = name
-        status.text = stat
-        weps.text = str(i['eps'])
-
-        wsd.text = "0000-00-00"
-        wfd.text = "0000-00-00"
-        score.text = str(int(i['rating']*2))
-        twatched.text = "0"
-
-        if str(i['started']) != "None": 
-            wsd.text = str(i['started']).split()[0]
-        
-        if str(i['completed']) != "None":
-            wfd.text = str(i['completed']).split()[0]
-
-        # becomes num of rewatches on MAL, so subtract 1
-        if (i['times'] > 1):
-            twatched.text = str(i['times']-1)
+        strlog = str(count) + ": " + name + " ---> " + foundID
+        logger.info("Added to cache: "+strlog)
 
         #MUST use 4 second delay for API rate limits
-        if cached == False:
-            strlog = str(count) + ": " + name + " ---> " + foundID
-            logger.info("Adding to cache: "+strlog)
-            delayCheck(args.api_delay)
+        delayCheck(args.api_delay)
+
+    return foundEntries
+
+def processConfirm():
+    answer = input("Would you like to process all entries? (y/n): ")
+    if answer.strip().lower() == "y":
+        return True
+    elif answer.strip().lower() == "n":
+        return False
+    logger.debug('ERROR: Bad input. Asking again.')
+    return processConfirm()
+
+def convertEntry(i, foundID, root):
+    name = i['name']
+
+    #Convert status
+    stat = i['status']
+    if stat == 'watched': stat = 'Completed'
+    elif stat == 'watching': stat = 'Watching'
+    elif stat == 'want to watch': stat = 'Plan to Watch'
+    elif stat == 'stalled': stat = 'On-Hold'
+    elif stat == 'dropped': stat = 'Dropped'
+    elif stat == "won't watch": return False
+
+    #Populate anime XML entry
+    entry = ET.SubElement(root, 'anime')
+    malid = ET.SubElement(entry, 'series_animedb_id')
+    title = ET.SubElement(entry, 'series_title')
+    weps = ET.SubElement(entry, 'my_watched_episodes')
+    wsd = ET.SubElement(entry, 'my_start_date')
+    wfd = ET.SubElement(entry, 'my_finish_date')
+    score = ET.SubElement(entry, 'my_score')
+    status = ET.SubElement(entry, 'my_status')
+    twatched = ET.SubElement(entry, 'my_times_watched')
+
+    malid.text = foundID
+    title.text = name
+    status.text = stat
+    weps.text = str(i['eps'])
+
+    wsd.text = "0000-00-00"
+    wfd.text = "0000-00-00"
+    score.text = str(int(i['rating']*2))
+    twatched.text = "0"
+
+    if str(i['started']) != "None": 
+        wsd.text = str(i['started']).split()[0]
+    
+    if str(i['completed']) != "None":
+        wfd.text = str(i['completed']).split()[0]
+
+    # becomes num of rewatches on MAL, so subtract 1
+    if (i['times'] > 1):
+        twatched.text = str(i['times']-1)
+
+
+def processList():
+    data = loadJSON(args.anime_list)
+
+    #Start MAL XML structure
+    root = ET.Element('myanimelist')
+    info = ET.SubElement(root, 'myinfo')
+    uname = ET.SubElement(info, 'user_name')
+    total = ET.SubElement(info, 'user_total_anime')
+    uname.text = data['user']['name']
+
+
+    cachedEntries, notFoundEntries, badEntries = getInitialCounts(data, root)
+
+    if processConfirm() == False:
+        logger.info("Ending program without processing, list not converted")
+        return
+
+    foundEntries = []
+    if args.cache_only == False:
+        foundEntries = searchEntries(notFoundEntries, root)
+
+    totalCount = len(data['entries'])
+    cacheFound = len(cachedEntries)
+    searchFound = len(foundEntries)
+    notFound = len(notFoundEntries)
+    badFound = len(badEntries)
 
     total.text = str(cacheFound + searchFound)
 
@@ -484,13 +547,16 @@ def main():
     dom = dom.toprettyxml(indent='\t')
     with open('convert.xml', 'w', encoding='utf-8') as f2:
         f2.write(dom)
-
+    
     print("=================================")
-    logger.info("Total Entries: "+str(len(data['entries'])))
+    logger.info("Total Entries: "+str(totalCount))
     logger.info("Cache Found: "+str(cacheFound))
     logger.info("Bad Found: "+str(badFound))
     logger.info("Search Found: "+str(searchFound))
     logger.info("Not Found: "+str(notFound))
+
+def main():
+    processList()
 
 
 if __name__ == "__main__":
