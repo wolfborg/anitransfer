@@ -23,18 +23,21 @@ load_dotenv()
 
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
-current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S");
+current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
 
 DEFAULTS = {
     'api_delay': 1.5, # in seconds
-    'log_file': 'logs/anitransfer_'+current_datetime+'.txt',
-    'cache_file': 'cache.csv',
-    'bad_file': 'bad.csv',
+    'log_file': 'logs/anitransfer/anitransfer_'+current_datetime+'.txt',
+    'cache_file': 'mappings/anime_cache.csv',
+    'bad_file': 'mappings/anime_bad.csv',
+    'unmapped_file': 'mappings/anime_unmapped.csv',
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
     'mal_api': False,
     'num_options': 10,
+    'search_queue': False,
+    'anime_list': 'export-anime.json',
     'limit': -1,
 }
 
@@ -64,6 +67,11 @@ def parse_arguments():
         '--bad-file',
         help='Cache file to use for incompatible anime mappings',
         default=DEFAULTS['bad_file']
+    )
+    parser.add_argument(
+        '--unmapped-file',
+        help='Cache file to use for anime mappings that have not been reviewed yet',
+        default=DEFAULTS['unmapped_file']
     )
     parser.add_argument(
         '--skip-confirm',
@@ -101,7 +109,17 @@ def parse_arguments():
         default=DEFAULTS['num_options'],
         type=int
     )
-    parser.add_argument('anime_list')
+    parser.add_argument(
+        '--search-queue',
+        help='Ignores all list processing, simply begins searches to clear the unmapped queue.',
+        default=DEFAULTS['search_queue'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--anime-list',
+        help='Anime Planet JSON export file to process. Not needed when using --search-queue.',
+        default=DEFAULTS['anime_list']
+    )
 
     args = parser.parse_args()
     return args
@@ -230,9 +248,11 @@ def jikanSearch(name):
         jikanOptions.append(jikanOption)
     
     selection = optionSelect(jikanOptions)
+
     if selection == False:
         logger.error("Couldn't find title -- "+name)
         return False
+    
     return selection
 
 def malGetTitles(entry):
@@ -290,9 +310,11 @@ def malSearch(full_name, assume_match=True):
         malOptions.append(malOption)
     
     selection = optionSelect(malOptions, full_name)
+
     if selection == False:
         logger.error("Couldn't find title -- "+ full_name)
         return False
+    
     return selection
 
 def printOptionInfo(id, titles, link):
@@ -313,9 +335,12 @@ def prompt(options, numOptions, name):
     elif answer.strip() == 'b':
         bad(name, args.bad_file)
         return False
+    elif answer.strip() == 'q':
+        return -1
     elif answer.isdigit() and int(answer) <= numOptions:
         answer = int(answer)-1
         return options[answer]['id']
+    
     logger.debug('ERROR: Bad input. Asking again.')
     return prompt(options, numOptions, name)
 
@@ -339,8 +364,9 @@ def optionSelect(options, name):
         if x >= numOptions:
             break
         x = x+1
-    print('[i] Manual ID')
+    print('[i] Enter manual ID')
     print('[b] Mark as bad entry')
+    print('[q] Quit program')
     print('[ENTER] Skip entry')
     getConfirmInfo(name)
     return prompt(options, numOptions, name)
@@ -408,6 +434,10 @@ def getInitialCounts(data, root):
         
         notFound += 1
         notFoundEntries.append(entry)
+        
+        unmappedEntry = unmappedCheck(name, args.unmapped_file)
+        if unmappedEntry == False:
+            unmapped(name, args.unmapped_file)
     
     print("=================================")
     print("Total Entries: "+str(len(data['entries'])))
@@ -437,9 +467,14 @@ def searchEntries(entries, root):
         name = entry['name']
         foundID = search(name)
 
+        if foundID == -1:
+            logger.info("Quitting program...")
+            break
+
         if foundID == False:
             notFound += 1
             notFoundEntries.append(entry)
+            #unmapped(name, args.unmapped_file)
             #MUST use 4 second delay for API rate limits
             delayCheck(args.api_delay)
             continue
@@ -460,7 +495,7 @@ def searchEntries(entries, root):
     return foundEntries
 
 def processConfirm():
-    answer = input("Would you like to process not found entries? (y/n): ")
+    answer = input("There is a search queue, would you like to process the queue now? (y/n): ")
     if answer.strip().lower() == "y":
         return True
     elif answer.strip().lower() == "n":
@@ -526,7 +561,10 @@ def processList():
     cachedEntries, notFoundEntries, badEntries = getInitialCounts(data, root)
 
     skipSearch = False
-    if args.cache_only or processConfirm() == False:
+    if len(notFoundEntries) <= 0:
+        skipSearch = True
+        logger.info("All entries found, processing converted list...")
+    elif args.cache_only or processConfirm() == False:
         skipSearch = True
         logger.info("Skipping search, processing cache-only converted list...")
 
@@ -537,9 +575,9 @@ def processList():
 
     totalCount = len(data['entries'])
     cacheFound = len(cachedEntries)
+    badFound = len(badEntries)
     searchFound = len(foundEntries)
     notFound = len(notFoundEntries)
-    badFound = len(badEntries)
 
     total.text = str(cacheFound + searchFound)
 
@@ -557,7 +595,31 @@ def processList():
     logger.info("Search Found: "+str(searchFound))
     logger.info("Not Found: "+str(notFound))
 
+def unmapped(name, unmapped_file):
+    with open(unmapped_file, 'a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow([name])
+
+def unmappedCheck(name, unmapped_file):
+    with open(unmapped_file, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    for i in data:
+        if i[0] == name:
+            return True
+        
+    return False
+
+def searchQueue():
+    print("search")
+    return
+
 def main():
+    if args.search_queue:
+        searchQueue()
+        return
+
     processList()
 
 

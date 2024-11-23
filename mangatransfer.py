@@ -28,9 +28,9 @@ current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S");
 
 DEFAULTS = {
     'api_delay': 1.5, # in seconds
-    'log_file': 'logs/mangatransfer_'+current_datetime+'.txt',
-    'cache_file': 'cache-manga.csv',
-    'bad_file': 'bad-manga.csv',
+    'log_file': 'logs/mangatransfer/mangatransfer_'+current_datetime+'.txt',
+    'cache_file': 'mappings/manga_cache.csv',
+    'bad_file': 'mappings/manga_bad.csv',
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
