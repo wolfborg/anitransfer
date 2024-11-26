@@ -11,6 +11,7 @@ requests = "^2.28.1"
 simplejson = "^3.18.0"
 pyperclip = "^1.8.2"
 python-dotenv = "^0.21.0"
+tqdm = "^4.67.1"
 
 [tool.poetry.dev-dependencies]
 

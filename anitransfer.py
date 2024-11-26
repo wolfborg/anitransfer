@@ -23,19 +23,22 @@ load_dotenv()
 
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
-current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+start_time = datetime.datetime.now()
+start_datetime = start_time.strftime("%Y-%m-%d_%H%M%S")
+
 
 DEFAULTS = {
     'api_delay': 1.5, # in seconds
-    'log_file': 'logs/anitransfer/anitransfer_'+current_datetime+'.txt',
+    'log_file': 'logs/anitransfer/anitransfer_'+start_datetime+'.txt',
     'cache_file': 'mappings/anime_cache.csv',
     'bad_file': 'mappings/anime_bad.csv',
     'unmapped_file': 'mappings/anime_unmapped.csv',
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
+    'open_tabs': False,
     'mal_api': False,
-    'num_options': 10,
+    'num_options': 6,
     'search_queue': False,
     'anime_list': 'export-anime.json',
     'limit': -1,
@@ -92,6 +95,12 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
+        '--open-tabs',
+        help='Opens the Anime Planet and MyAnimeList search tabs in your browser during manual confirmation',
+        default=DEFAULTS['open_tabs'],
+        action='store_true'
+    )
+    parser.add_argument(
         '--mal-api',
         help='Uses MAL API instead when doing search (MAL_CLIENT_ID  required in .env file).',
         default=DEFAULTS['mal_api'],
@@ -126,6 +135,19 @@ def parse_arguments():
 
 args = parse_arguments()
 
+
+
+def processCacheFiles(file):
+    with open(file, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+        
+    return data
+
+cache_data = processCacheFiles(args.cache_file)
+bad_data = processCacheFiles(args.bad_file)
+#unmapped_data = processCacheFiles(args.unmapped_file)
+
 def setupLogger(LOG_FILE_NAME = str(date.today())+".log"):
     """Sets up and returns a log file to be used during a script."""
     logger = logging.getLogger(__name__)
@@ -155,17 +177,13 @@ def loadJSON(filename):
     f.close()
     return data
 
-def cache(name, malid, cache_file):
-    with open(cache_file, 'a', newline='', encoding='utf-8') as f:
+def cache(name, malid):
+    with open(args.cache_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name, malid])
 
-def cacheSearch(name, cache_file):
-    with open(cache_file, newline='', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        data = list(reader)
-
-    for i in data:
+def cacheSearch(name):
+    for i in cache_data:
         if i[0] == name:
             mal = i[1]
             #logger.info('Cached ID found: ' + name + ' ---> ' + mal)
@@ -173,19 +191,15 @@ def cacheSearch(name, cache_file):
     #print('Cached Not found.')
     return False
 
-def badSearch(name, bad_file):
-    with open(bad_file, newline='', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        data = list(reader)
-
-    for i in data:
+def badSearch(name):
+    for i in bad_data:
         if i[0] == name:
             #logger.info('Bad title found: ' + name + ' ---> SKIP')
             return True
     return False
 
-def bad(name, bad_file):
-    with open(bad_file, 'a', newline='', encoding='utf-8') as f:
+def bad(name):
+    with open(args.bad_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name])
 
@@ -333,7 +347,8 @@ def prompt(options, numOptions, name):
         malID = input("Enter MAL ID: ")
         return malID
     elif answer.strip() == 'b':
-        bad(name, args.bad_file)
+        bad(name)
+        removeUnmapped(name)
         return False
     elif answer.strip() == 'q':
         return -1
@@ -364,11 +379,16 @@ def optionSelect(options, name):
         if x >= numOptions:
             break
         x = x+1
+    
+    print()
     print('[i] Enter manual ID')
     print('[b] Mark as bad entry')
     print('[q] Quit program')
     print('[ENTER] Skip entry')
-    getConfirmInfo(name)
+
+    if args.open_tabs:
+        getConfirmInfo(name)
+
     return prompt(options, numOptions, name)
 
 def search(name):
@@ -399,8 +419,8 @@ def search(name):
 def getConfirmInfo(name):
     #pyperclip.copy(name)
     query = urllib.parse.quote_plus(str(name))
-    mal_url = "https://myanimelist.net/anime.php?cat=anime&q="+query[:99]
-    webbrowser.open(mal_url, new=2, autoraise=True)
+    #mal_url = "https://myanimelist.net/anime.php?cat=anime&q="+query[:99]
+    #webbrowser.open(mal_url, new=2, autoraise=True)
     planet_url = "https://www.anime-planet.com/anime/all?name="+query
     webbrowser.open(planet_url, new=2, autoraise=True)
 
@@ -416,14 +436,14 @@ def getInitialCounts(data, root):
     for entry in data['entries']:
         name = entry['name']
         
-        if badSearch(name, args.bad_file):
+        if badSearch(name):
             badFound += 1
             badEntries.append(entry)
             logger.error("Bad title -- "+name)
             logger.info('Bad title found: ' + name + ' ---> SKIP')
             continue
 
-        foundID = cacheSearch(name, args.cache_file)
+        foundID = cacheSearch(name)
         if foundID != False:
             cacheFound += 1
             cachedEntries.append(entry)
@@ -482,7 +502,7 @@ def searchEntries(entries, root):
         found += 1
 
         foundEntries.append(foundID)
-        cache(name, foundID, args.cache_file)
+        cache(name, foundID)
 
         convertEntry(entry, foundID, root)
 
@@ -600,6 +620,25 @@ def unmapped(name, unmapped_file):
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name])
 
+def removeUnmapped(name):
+    with open(args.unmapped_file, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    row = False
+    rowNum = 0
+    for i in data:
+        if i[0] == name:
+            row = rowNum
+            break
+        rowNum += 1
+
+    newRows = data[:row] + data[row+1:]
+
+    with open(args.unmapped_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerows(newRows)
+
 def unmappedCheck(name, unmapped_file):
     with open(unmapped_file, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
@@ -612,8 +651,62 @@ def unmappedCheck(name, unmapped_file):
     return False
 
 def searchQueue():
-    print("search")
-    return
+    with open(args.unmapped_file, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    queueTotal = len(data)
+
+    count = 0
+    foundEntries = []
+    #notFoundEntries = []
+
+    for name in data:
+        #Use this for smaller tests
+        limit = args.limit
+        if limit > -1 and count >= limit:
+            break
+
+        name = name[0]
+
+        foundID = False
+        count += 1
+        
+        foundID = search(name)
+
+        if foundID == -1:
+            logger.info("Quitting program...")
+            break
+
+        if foundID == False:
+            #notFound += 1
+            #notFoundEntries.append(name)
+            #MUST use 4 second delay for API rate limits
+            delayCheck(args.api_delay)
+            os.system('clear')
+            print("PROGRESS: " + str(count) + " / " + str(queueTotal))
+            continue
+
+        foundEntries.append(foundID)
+        cache(name, foundID)
+        removeUnmapped(name)
+
+        os.system('clear')
+
+        strlog = name + " ---> " + foundID
+        logger.info("Added to cache: "+strlog)
+        print("PROGRESS: " + str(count) + " / " + str(queueTotal))
+
+        #MUST use 4 second delay for API rate limits
+        delayCheck(args.api_delay)
+
+
+    searchFound = len(foundEntries)
+    notFound = queueTotal
+
+    print("=================================")
+    logger.info("Search Found: "+str(searchFound))
+    logger.info("Not Found: "+str(notFound))
 
 def main():
     if args.search_queue:
@@ -625,3 +718,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # end_time = datetime.datetime.now()
+    # process_time = end_time - start_time
+    # print()
+    # print(process_time)
