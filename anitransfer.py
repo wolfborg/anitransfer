@@ -36,6 +36,7 @@ DEFAULTS = {
     'skip_confirm': False,
     'cache_only': False,
     'with_links': False,
+    'with_info': False,
     'open_tabs': False,
     'mal_api': False,
     'num_options': 6,
@@ -92,6 +93,12 @@ def parse_arguments():
         '--with-links',
         help='Displays links to found MyAnimeList entries to help with manual confirmation.',
         default=DEFAULTS['with_links'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--with-info',
+        help='Displays entry info for found MyAnimeList entries to help with manual confirmation.',
+        default=DEFAULTS['with_info'],
         action='store_true'
     )
     parser.add_argument(
@@ -261,7 +268,7 @@ def jikanSearch(name):
         jikanOption = {"id": id, "titles": titles, "link": link}
         jikanOptions.append(jikanOption)
     
-    selection = optionSelect(jikanOptions)
+    selection = optionSelect(jikanOptions, name)
 
     if selection == False:
         logger.error("Couldn't find title -- "+name)
@@ -309,10 +316,20 @@ def malSearch(full_name, assume_match=True):
 
     malOptions = []
     malEntries = malData['data']
+    #print(malData['data'][0])
     for entry in malEntries:
         entry = entry['node']
         id = str(entry['id'])
         link = "https://myanimelist.net/anime/"+id
+        
+        num_eps = str(entry['num_episodes'])
+        start_year = str(entry['start_date'].split('-')[0])
+        ep_length = str(round(entry['average_episode_duration'] / 60))
+        media_type = str(entry['media_type'])
+
+        studio = ""
+        if len(entry['studios']) > 0:
+            studio = str(entry['studios'][0]['name'])
  
         titles = malGetTitles(entry)
         if assume_match:
@@ -320,7 +337,16 @@ def malSearch(full_name, assume_match=True):
                 logger.info("MAL match found: "+id)
                 return id
 
-        malOption = {"id": id, "titles": titles, "link": link}
+        malOption = {
+            "id": id,
+            "titles": titles,
+            "link": link,
+            "num_eps": num_eps,
+            "start_year": start_year,
+            "ep_length": ep_length,
+            "media_type": media_type,
+            "studio": studio
+        }
         malOptions.append(malOption)
     
     selection = optionSelect(malOptions, full_name)
@@ -373,6 +399,16 @@ def optionSelect(options, name):
         link = option['link']
         print('[' + str(x) + '] ' + title)
         # printOptionInfo(id, titles, link)
+        
+        if args.mal_api and args.with_info:
+            num_eps = option['num_eps']
+            start_year = option['start_year']
+            ep_length = option['ep_length']
+            media_type = option['media_type']
+            studio = option['studio']
+
+            print(start_year + " -- " + media_type + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio)
+
         if args.with_links:
             print(link)
             print()
@@ -515,6 +551,10 @@ def searchEntries(entries, root):
     return foundEntries
 
 def processConfirm():
+    if args.skip_confirm:
+        print("There is a search queue. Please use --search-queue to process the remaining unconfirmed entries. When the search queue is clear you can use --cache-only to generate your converted list.")
+        return False
+
     answer = input("There is a search queue, would you like to process the queue now? (y/n): ")
     if answer.strip().lower() == "y":
         return True
@@ -715,10 +755,12 @@ def main():
 
     processList()
 
+def script_timer():
+    end_time = datetime.datetime.now()
+    process_time = end_time - start_time
+    print()
+    print(process_time)
 
 if __name__ == "__main__":
     main()
-    # end_time = datetime.datetime.now()
-    # process_time = end_time - start_time
-    # print()
-    # print(process_time)
+    # script_timer()
