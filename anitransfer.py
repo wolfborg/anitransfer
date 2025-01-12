@@ -16,6 +16,7 @@ import sys, os
 import webbrowser
 from dotenv import load_dotenv
 import urllib.parse
+from bs4 import BeautifulSoup
 
 sys.stdout.reconfigure(encoding='utf-8')
 

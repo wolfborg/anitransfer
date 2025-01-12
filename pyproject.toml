@@ -12,6 +12,7 @@ simplejson = "^3.18.0"
 pyperclip = "^1.8.2"
 python-dotenv = "^0.21.0"
 tqdm = "^4.67.1"
+beautifulsoup4 = "^4.12.3"
 
 [tool.poetry.dev-dependencies]
 
