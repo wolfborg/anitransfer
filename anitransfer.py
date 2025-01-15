@@ -29,7 +29,7 @@ load_dotenv()
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'api_delay': 0.2, # in seconds
+    'api_delay': 1.5, # in seconds
     'log_file': 'logs/anitransfer/anitransfer_'+start_datetime+'.txt',
     'cache_file': 'mappings/anime_cache.csv',
     'bad_file': 'mappings/anime_bad.csv',
@@ -45,6 +45,7 @@ DEFAULTS = {
     'search_queue': False,
     'anime_list': 'export-anime.json',
     'limit': -1,
+    'offset': 0,
 }
 
 def parse_arguments():
@@ -98,7 +99,7 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
-        '--with-info',
+        '--with-mal-info',
         help='Displays entry info for found MyAnimeList entries to help with manual confirmation.',
         default=DEFAULTS['with_mal_info'],
         action='store_true'
@@ -125,6 +126,12 @@ def parse_arguments():
         '--limit',
         help='Limits the number of entries to process',
         default=DEFAULTS['limit'],
+        type=int
+    )
+    parser.add_argument(
+        '--offset',
+        help='Determines which entry number to start with during search queue processing',
+        default=DEFAULTS['offset'],
         type=int
     )
     parser.add_argument(
@@ -225,7 +232,8 @@ def delayCheck(delay):
     now = datetime.datetime.now()
     dtime = now - qtime
     secs = dtime.total_seconds()
-    diff = math.ceil(delay - secs)
+    #diff = math.ceil(delay - secs)
+    diff = delay - secs
     if secs < delay:
         time.sleep(diff)
     qtime = datetime.datetime.now()
@@ -495,6 +503,7 @@ def getAnimePlanetInfo(name):
 
     global driver
     driver.get(anime_planet_query_url)
+    time.sleep(1)
 
     #driver.get("https://www.anime-planet.com/anime/all?name=test")
 
@@ -627,10 +636,16 @@ def searchEntries(entries, root):
     found = 0
     notFound = 0
 
+    #queueTotal = len(entries)
+
     foundEntries = []
     notFoundEntries = []
-
+    
     for entry in entries:
+        if count < args.offset:
+            count += 1
+            continue
+
         #Use this for smaller tests
         limit = args.limit
         if limit > -1 and count >= limit:
@@ -819,8 +834,12 @@ def searchQueue():
     count = 0
     foundEntries = []
     #notFoundEntries = []
-
+    print("PROGRESS: " + str(count) + " / " + str(queueTotal))
     for name in data:
+        if count < args.offset:
+            count += 1
+            continue
+
         #Use this for smaller tests
         limit = args.limit
         if limit > -1 and count >= limit:
