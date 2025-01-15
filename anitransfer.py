@@ -503,7 +503,9 @@ def getAnimePlanetInfo(name):
 
     global driver
     driver.get(anime_planet_query_url)
-    time.sleep(1)
+
+    if args.skip_confirm:
+        time.sleep(1)
 
     #driver.get("https://www.anime-planet.com/anime/all?name=test")
 
