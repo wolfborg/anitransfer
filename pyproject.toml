@@ -13,6 +13,7 @@ pyperclip = "^1.8.2"
 python-dotenv = "^0.21.0"
 tqdm = "^4.67.1"
 beautifulsoup4 = "^4.12.3"
+selenium = "^4.27.1"
 
 [tool.poetry.dev-dependencies]
 

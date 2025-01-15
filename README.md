@@ -10,19 +10,17 @@ poetry install
 
 Run the conversion.
 ```bash
-poetry run python anitransfer.py path/to/your/file.json
-```
-
-```bash
-poetry run python anitransfer.py ~/Downloads/export-anime-GhostLyrics.json
+poetry run python anitransfer.py --anime-list="path/to/your/file.json"
 ```
 
 When it's done running, a file called "convert.xml" will be in the folder. Use this to import your list.
 
 If you would like to see a full list of available options, run `poetry run python anitransfer.py --help`.
 
-## MAL API
-In order to convert lists, you need to match Anime Planet titles to MyAnimeList IDs. This script has two APIs which can accomplish this. The original Jikan API this script relied on changed to v4 recently and right now its search queries are really bad. So for now it's recommended to use the MyAnimeList API instead with this script.
+## MAL API Usage
+In order to convert from Anime Planet to AniList, we need to convert the list into a MyAnimeList. And in order to do that you need to match Anime Planet titles to MyAnimeList IDs. This script contains an existing cache of successful mappings which should hopefully speed up the process, but anything beyond that still needs to be mapped.
+
+This script can use two APIs to accomplish this: the MyAnimeList API and the Jikan API. By default, this script will use the Jikan API because it does not require any kind of authentication, but it is a third party MAL search API which tends to give bad results and is slow due to rate limiting. Instead it is highly recommended to use the official MyAnimeList API.
 
 To use the MyAnimeList API, you must register for a client ID on the [MyAnimeList API panel](https://myanimelist.net/apiconfig). This will require a MyAnimeList account.
 
@@ -41,11 +39,7 @@ After that, you'll be able to run the script with the new `--mal-api` option. Wi
 poetry run python anitransfer.py --anime_list="path/to/your/file.json" --mal-api
 ```
 
-Keep in mind the API currently does not have a publicly defined rate limit, but it's probably best to keep a delay on each request. The default API delay (for MAL and Jikan) is currently set to 1.5 seconds. This will only trigger a delay when an API request is actually done.
-
-MAL API is far more effective than Jikan API search right now except for long titles. MAL API search "q" parameter for the query appears to have a character limit that isn't defined in their documentation. The limit appears to be 64 characters from some testing on my end. Any search done with a title longer than this limit will return a "bad request" message from the API. So I've added in checks for that to ignore those and keep the script going.
-
-Might make it in the future so it tries to search with the first 64 characters. For now though those cases can be resolved by running the script with Jikan API after first processing the list through the MAL API. Or by manually searching for the MAL ID and then adding the cache mapping to the file yourself.
+Keep in mind the MAL API currently does not have a publicly defined rate limit, but it's probably best to keep a delay on each request. The default API delay (for MAL and Jikan) is currently set to 1.5 seconds. This will only trigger a delay when an API request is actually done.
 
 Additional related links:
 https://myanimelist.net/forum/?topicid=1973141
@@ -63,9 +57,11 @@ https://myanimelist.net/apiconfig/references/api/v2
 
 `--skip-confirm`: Skip any confirmation prompts that show up, still tries initial search for entries.
 
-`--with-links`: Displays links to found MyAnimeList entries to help with manual confirmation.
+`--with-mal-links`: Displays links to found MyAnimeList entries to help with manual confirmation.
 
-`--with-info`: Displays entry info for found MyAnimeList entries to help with manual confirmation.
+`--with-mal-info`: Displays entry info for found MyAnimeList entries to help with manual confirmation. Requires MAL API flag enabled.
+
+`--selenium`: Launches a selenium web browser to automatically check Anime Planet info.
 
 `--open-tabs`: Opens the Anime Planet and MyAnimeList search tabs in your browser during manual confirmation.
 
@@ -85,14 +81,26 @@ https://myanimelist.net/apiconfig/references/api/v2
 
 Typically I run the script with `--cache-only` first to see if we already have every entry on the list. If there are still entries that weren't found, I then run it again with the `--mal-api --skip-confirm` flags enabled. This attempts automated matches based on a search APIs of the MAL database. MAL API is best search API to use for that but requires you to get credentials and add it to the .env file here. By default the search API used is Jikan because it doesn't require credentials, but it is still a third-party search API for MAL and isn't as effective.
 
-If there are still entries that weren't found after that, then the remainder must be manually confirmed. Luckily, any entry that wasn't found by now has been added to the "anime_unmapped.csv" file so you don't have to reprocess your whole list. Simply use the `--search-queue` flag and it will present you with options to select for manual confirmation. It's recommended to use the `--mal-api` flag with this as well so the options are better. To make this process easier, I've added a `--with-info` flag that shows basic information like start year, episode counts and lengths, and studio of each MAL search result. Meanwhile, the `--open-tabs` flag will automatically open a browser tag for the current entry's Anime Planet page. Combine both `--with-info` and `--open-tabs` flags to compare the info on the Anime Planet page with the info displayed in the MAL selections to determine if there's a match. If you're unsure, you can use the `--with-links` flag to include links to the MAL entries to help you decide. Every confirmation is updated as you go, so if you have to end the process for now you can continue manually going through the queue later. In fact your anime list isn't even needed to go through the search queue, as that flag completely ignores lists and makes the sole purpose of the script to manually confirm matches.
+If there are still entries that weren't found after that, then the remainder must be manually confirmed. Luckily, any entry that wasn't found by now has been added to the "anime_unmapped.csv" file so you don't have to reprocess your whole list. Simply use the `--search-queue` flag and it will present you with options to select for manual confirmation. It's recommended to use the `--mal-api` flag with this as well so the options are better.
+
+To make the new matching process easier, I've added a `--with-mal-info` flag that shows basic information like start year, episode counts and lengths, and studio of each MAL search result. Meanwhile, the `--open-tabs` flag will automatically open a browser tag for the current entry's Anime Planet page. Combine both `--with--mal-info` and `--open-tabs` flags to compare the info on the Anime Planet page with the info displayed in the MAL selections to determine if there's a match. If you're unsure, you can use the `--with-mal-links` flag to include links to the MAL entries to help you decide. Every confirmation is updated as you go, so if you have to end the process for now you can continue manually going through the queue later. In fact your anime list isn't even needed to go through the search queue, as that flag completely ignores lists and makes the sole purpose of the script to manually confirm matches.
 
 Once the search queue is clear, make sure you process your list with the `--cache-only` flag to reprocess your list so that your converted file now includes the new entries you had manually confirmed. At that point, if it says there are no entries left to find, then you should be done. Make sure to review the log file for any issues that might have to be fixed after importing to AniList.
 
 ```bash
+# quick cache only check
 poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --cache-only
-poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --mal-api --skip-confirm
-poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --mal-api --search-queue --with-info --with-links --open-tabs
+
+# check search queue automatically via api for any title matches (omit --mal-api to use jikan instead)
+poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --mal-api --search-queue --skip-confirm
+
+# check search queue automatically via api while also grabbing anime planet info to use
+poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --mal-api --search-queue --with-mal-info --selenium --skip-confirm
+
+# process search queue manually via selectable options until complete (use --selenium to auto open page)
+poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --mal-api --search-queue --with-mal-info --with-mal-links --selenium
+
+# reprocess with cache only to finish conversion
 poetry run python anitransfer.py --anime-list="samples/export-anime-Wolfborg.json" --cache-only
 ```
 

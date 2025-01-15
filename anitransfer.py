@@ -17,30 +17,31 @@ import webbrowser
 from dotenv import load_dotenv
 import urllib.parse
 from bs4 import BeautifulSoup
-
-sys.stdout.reconfigure(encoding='utf-8')
-
-load_dotenv()
-
-MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 
 start_time = datetime.datetime.now()
 start_datetime = start_time.strftime("%Y-%m-%d_%H%M%S")
+qtime = datetime.datetime.now()
+sys.stdout.reconfigure(encoding='utf-8')
 
+load_dotenv()
+MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'api_delay': 1.5, # in seconds
+    'api_delay': 0.2, # in seconds
     'log_file': 'logs/anitransfer/anitransfer_'+start_datetime+'.txt',
     'cache_file': 'mappings/anime_cache.csv',
     'bad_file': 'mappings/anime_bad.csv',
     'unmapped_file': 'mappings/anime_unmapped.csv',
     'skip_confirm': False,
     'cache_only': False,
-    'with_links': False,
-    'with_info': False,
+    'with_mal_links': False,
+    'with_mal_info': False,
     'open_tabs': False,
     'mal_api': False,
-    'num_options': 6,
+    'selenium': False,
+    'num_options': 10,
     'search_queue': False,
     'anime_list': 'export-anime.json',
     'limit': -1,
@@ -91,15 +92,21 @@ def parse_arguments():
         action='store_true'
     )
     parser.add_argument(
-        '--with-links',
+        '--with-mal-links',
         help='Displays links to found MyAnimeList entries to help with manual confirmation.',
-        default=DEFAULTS['with_links'],
+        default=DEFAULTS['with_mal_links'],
         action='store_true'
     )
     parser.add_argument(
         '--with-info',
         help='Displays entry info for found MyAnimeList entries to help with manual confirmation.',
-        default=DEFAULTS['with_info'],
+        default=DEFAULTS['with_mal_info'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--selenium',
+        help='Launches a selenium web browser, required for automatically checking Anime Planet info.',
+        default=DEFAULTS['selenium'],
         action='store_true'
     )
     parser.add_argument(
@@ -143,7 +150,9 @@ def parse_arguments():
 
 args = parse_arguments()
 
-
+if args.selenium:
+    service = Service(executable_path="chromedriver.exe")
+    driver = webdriver.Chrome(service=service)
 
 def processCacheFiles(file):
     with open(file, newline='', encoding='utf-8') as f:
@@ -210,8 +219,6 @@ def bad(name):
     with open(args.bad_file, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow([name])
-
-qtime = datetime.datetime.now()
 
 def delayCheck(delay):
     global qtime
@@ -287,7 +294,7 @@ def malGetTitles(entry):
             titles.append(synonyms)
     return titles
 
-def malSearch(full_name, assume_match=True):
+def malSearch(full_name, anime_planet_info=False, assume_match=True):
     name = full_name
 
     if len(name) >= 65:
@@ -323,8 +330,10 @@ def malSearch(full_name, assume_match=True):
         id = str(entry['id'])
         link = "https://myanimelist.net/anime/"+id
         
+        start_year = "Unknown"
+        if "start_date" in entry:
+            start_year = str(entry['start_date'].split('-')[0])
         num_eps = str(entry['num_episodes'])
-        start_year = str(entry['start_date'].split('-')[0])
         ep_length = str(round(entry['average_episode_duration'] / 60))
         media_type = str(entry['media_type'])
 
@@ -336,17 +345,30 @@ def malSearch(full_name, assume_match=True):
         if assume_match:
             if name.lower() in [x.lower() for x in titles]:
                 logger.info("MAL match found: "+id)
+                logger.info("MAL title: "+titles[0])
+                return id
+
+        if anime_planet_info:
+            ap_start_year = anime_planet_info['start_year']
+            ap_num_eps = anime_planet_info['num_eps']
+            ap_ep_length = anime_planet_info['ep_length']
+            ap_media_type = anime_planet_info['media_type']
+            ap_studio = anime_planet_info['studio']
+
+            if start_year == ap_start_year and num_eps == ap_num_eps and studio == ap_studio:
+                logger.info("MAL match found: "+id)
+                logger.info("MAL title: "+titles[0])
                 return id
 
         malOption = {
             "id": id,
             "titles": titles,
             "link": link,
-            "num_eps": num_eps,
             "start_year": start_year,
+            "num_eps": num_eps,
             "ep_length": ep_length,
-            "media_type": media_type,
-            "studio": studio
+            "studio": studio,
+            "media_type": media_type
         }
         malOptions.append(malOption)
     
@@ -362,7 +384,7 @@ def printOptionInfo(id, titles, link):
     print("MAL ID: "+id)
     for title in titles:
         print(" - "+title)
-    if args.with_links:
+    if args.with_mal_links:
         print(link)
     print()
 
@@ -388,6 +410,7 @@ def prompt(options, numOptions, name):
 
 def optionSelect(options, name):
     if args.skip_confirm:
+        print()
         logger.info('SKIP: Skipping confirmation')
         return False
 
@@ -401,16 +424,16 @@ def optionSelect(options, name):
         print('[' + str(x) + '] ' + title)
         # printOptionInfo(id, titles, link)
         
-        if args.mal_api and args.with_info:
+        if args.mal_api and args.with_mal_info:
             num_eps = option['num_eps']
             start_year = option['start_year']
             ep_length = option['ep_length']
             media_type = option['media_type']
             studio = option['studio']
 
-            print(start_year + " -- " + media_type + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio)
+            print(start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
 
-        if args.with_links:
+        if args.with_mal_links:
             print(link)
             print()
         if x >= numOptions:
@@ -424,21 +447,30 @@ def optionSelect(options, name):
     print('[ENTER] Skip entry')
 
     if args.open_tabs:
-        getConfirmInfo(name)
+        openTabs(name)
 
     return prompt(options, numOptions, name)
 
 def search(name):
     print()
     print('==============')
-    logger.info('Anime Planet title: ' + name)
+    print('[ANIME PLANET]')
+    print('[*] '+ name)
 
     if len(name) < 3:
         logger.error("Search title too small -- " + name)
         return False
 
+    if args.skip_confirm:
+        delayCheck(args.api_delay)
+
+    anime_planet_info = False
+
+    if args.selenium:
+        anime_planet_info = getAnimePlanetInfo(name)
+
     if args.mal_api:
-        malResult = malSearch(name)
+        malResult = malSearch(name, anime_planet_info)
         print('==============')
         print()
         if malResult:
@@ -453,13 +485,99 @@ def search(name):
         return jikanResult
     return False
 
-def getConfirmInfo(name):
+def getAnimePlanetInfo(name):
+    anime_planet_info = {}
+
+    query = urllib.parse.quote_plus(str(name))
+
+    anime_planet_domain = "https://www.anime-planet.com"
+    anime_planet_query_url = anime_planet_domain + "/anime/all?name="+query
+
+    global driver
+    driver.get(anime_planet_query_url)
+
+    #driver.get("https://www.anime-planet.com/anime/all?name=test")
+
+    if (anime_planet_domain + "/anime/all?name=") in driver.current_url:
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        cards = soup.find_all("li", {"class": "card"})
+
+        anime_planet_found = False
+        for card in cards:
+            title = card.find("h3", {"class": "cardName"}).text
+            link = anime_planet_domain + card.find("a")['href']
+            if title == name:
+                anime_planet_found = True
+                driver.get(link)
+
+        if anime_planet_found == False:
+            logger.error("Unable to automatically find Anime Planet url for title: " + str(name))
+            return anime_planet_info
+    
+    content = driver.page_source
+    soup = BeautifulSoup(content, "html.parser")
+
+    info_section = soup.find("section", {"class": "pure-g entryBar"})
+
+    start_year = "???"
+    num_eps = "???"
+    ep_length = "???"
+    studio = "???"
+    media_type = "???"
+
+
+    start_year = info_section.find("span", {"class": "iconYear"}).text.strip().split(" - ")[0]
+
+    ep_info = info_section.find("span", {"class": "type"}).text
+    if " ep" in ep_info:
+        ep_info_split = ep_info.split("(")
+        if len(ep_info_split) > 1:
+            ep_info = ep_info_split[1].replace(")","").strip()
+
+        num_eps = ep_info.split(" ep")[0].strip()
+        if "+" in num_eps:
+            num_eps = "???"
+
+        ep_length_splitter = " eps x "
+        if num_eps != "???" and int(num_eps) == 1:
+            ep_length_splitter = " ep x "
+
+        ep_length_split = ep_info.split(ep_length_splitter)
+        if len(ep_length_split) > 1:
+            ep_length = ep_length_split[1].replace(" min", "").strip()
+
+    studio_html = info_section.find("a")
+    if studio_html:
+        studio = studio_html.text.strip()
+    
+    media_type = info_section.find("span", {"class": "type"}).text.split("(")[0].strip().lower()
+
+    #print("start_year:" + str(start_year))
+    #print("num_eps: " + str(num_eps))
+    #print("ep_length: " + str(ep_length))
+    #print("studio: " + str(studio))
+    #print("media_type: " + str(media_type))
+
+    print(start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
+
+    anime_planet_info = {
+        "start_year": start_year,
+        "num_eps": num_eps,
+        "ep_length": ep_length,
+        "studio": studio,
+        "media_type": media_type
+    }
+
+    return anime_planet_info
+
+
+def openTabs(name):
     #pyperclip.copy(name)
     query = urllib.parse.quote_plus(str(name))
     #mal_url = "https://myanimelist.net/anime.php?cat=anime&q="+query[:99]
     #webbrowser.open(mal_url, new=2, autoraise=True)
-    planet_url = "https://www.anime-planet.com/anime/all?name="+query
-    webbrowser.open(planet_url, new=2, autoraise=True)
+    anime_planet_url = "https://www.anime-planet.com/anime/all?name="+query
+    webbrowser.open(anime_planet_url, new=2, autoraise=True)
 
 def getInitialCounts(data, root):
     cacheFound = 0
@@ -532,8 +650,8 @@ def searchEntries(entries, root):
             notFound += 1
             notFoundEntries.append(entry)
             #unmapped(name, args.unmapped_file)
-            #MUST use 4 second delay for API rate limits
-            delayCheck(args.api_delay)
+            #MUST use 4 second delay for Jikan API rate limits
+            #delayCheck(args.api_delay)
             continue
 
         found += 1
@@ -546,8 +664,8 @@ def searchEntries(entries, root):
         strlog = str(count) + ": " + name + " ---> " + foundID
         logger.info("Added to cache: "+strlog)
 
-        #MUST use 4 second delay for API rate limits
-        delayCheck(args.api_delay)
+        #MUST use 4 second delay for Jikan API rate limits
+        #delayCheck(args.api_delay)
 
     return foundEntries
 
@@ -722,9 +840,10 @@ def searchQueue():
         if foundID == False:
             #notFound += 1
             #notFoundEntries.append(name)
-            #MUST use 4 second delay for API rate limits
-            delayCheck(args.api_delay)
-            os.system('clear')
+            #MUST use 4 second delay for Jikan API rate limits
+            #delayCheck(args.api_delay)
+            if args.skip_confirm == False:
+                os.system('clear')
             print("PROGRESS: " + str(count) + " / " + str(queueTotal))
             continue
 
@@ -732,14 +851,15 @@ def searchQueue():
         cache(name, foundID)
         removeUnmapped(name)
 
-        os.system('clear')
+        if args.skip_confirm == False:
+            os.system('clear')
 
         strlog = name + " ---> " + foundID
         logger.info("Added to cache: "+strlog)
         print("PROGRESS: " + str(count) + " / " + str(queueTotal))
 
-        #MUST use 4 second delay for API rate limits
-        delayCheck(args.api_delay)
+        #MUST use 4 second delay for Jikan API rate limits
+        #delayCheck(args.api_delay)
 
 
     searchFound = len(foundEntries)
