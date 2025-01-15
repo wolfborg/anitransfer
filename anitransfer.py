@@ -41,7 +41,7 @@ DEFAULTS = {
     'open_tabs': False,
     'mal_api': False,
     'selenium': False,
-    'num_options': 10,
+    'num_options': 6,
     'search_queue': False,
     'anime_list': 'export-anime.json',
     'limit': -1,
@@ -443,7 +443,9 @@ def optionSelect(options, name):
 
         if args.with_mal_links:
             print(link)
-            print()
+
+        print()
+
         if x >= numOptions:
             break
         x = x+1
