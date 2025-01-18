@@ -3,6 +3,7 @@
 /convert*.xml
 /converted/
 /samples/
+/mal_store/
 __pycache__/
 *.py[cod]
 *$py.class

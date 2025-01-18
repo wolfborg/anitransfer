@@ -29,7 +29,7 @@ load_dotenv()
 MAL_CLIENT_ID = os.getenv('MAL_CLIENT_ID')
 
 DEFAULTS = {
-    'api_delay': 1.5, # in seconds
+    'api_delay': 2.0, # in seconds
     'log_file': 'logs/anitransfer/anitransfer_'+start_datetime+'.txt',
     'cache_file': 'mappings/anime_cache.csv',
     'bad_file': 'mappings/anime_bad.csv',
@@ -43,6 +43,9 @@ DEFAULTS = {
     'selenium': False,
     'num_options': 6,
     'search_queue': False,
+    'cache_verify': False,
+    'mal_api_store': False,
+    'use_mal_store': False,
     'anime_list': 'export-anime.json',
     'limit': -1,
     'offset': 0,
@@ -144,6 +147,24 @@ def parse_arguments():
         '--search-queue',
         help='Ignores all list processing, simply begins searches to clear the unmapped queue.',
         default=DEFAULTS['search_queue'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--cache-verify',
+        help='Automatically checks title matches of cache file.',
+        default=DEFAULTS['cache_verify'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--mal-api-store',
+        help='Automatically stores MAL API entry details for local use later.',
+        default=DEFAULTS['mal_api_store'],
+        action='store_true'
+    )
+    parser.add_argument(
+        '--use-mal-store',
+        help='Automatically stores MAL API entry details for local use later.',
+        default=DEFAULTS['use_mal_store'],
         action='store_true'
     )
     parser.add_argument(
@@ -439,7 +460,7 @@ def optionSelect(options, name):
             media_type = option['media_type']
             studio = option['studio']
 
-            print(start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
+            print("year: " + start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
 
         if args.with_mal_links:
             print(link)
@@ -571,7 +592,7 @@ def getAnimePlanetInfo(name):
     #print("studio: " + str(studio))
     #print("media_type: " + str(media_type))
 
-    print(start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
+    print("year: " + start_year + " -- " + num_eps + " ep -- " + ep_length + " mins -- " + studio + " -- " + media_type)
 
     anime_planet_info = {
         "start_year": start_year,
@@ -892,7 +913,154 @@ def searchQueue():
     logger.info("Search Found: "+str(searchFound))
     logger.info("Not Found: "+str(notFound))
 
+def cache_verify():
+    count = 1
+
+    global cache_data
+    full_cache_size = len(cache_data)
+
+    if args.offset > 0:
+        cache_data = cache_data[args.offset:]
+        count = args.offset + 1
+    
+    needs_check = 0
+    for cache_info in cache_data:
+        #print("[ "+str(count) + " / " + str(full_cache_size)+" ]")
+        ap_title = cache_info[0]
+        mal_id = cache_info[1]
+
+        mal_titles = ['']
+
+        if args.use_mal_store:
+            mal_data = get_mal_store_data_by_id(mal_id)
+            mal_titles = malGetTitles(mal_data)
+        elif args.mal_api:
+            mal_titles = get_mal_titles_by_id(mal_id)
+
+        if ap_title.lower() in [x.lower() for x in mal_titles]:
+            #print(ap_title)
+            #print("MATCH FOUND --> " + mal_id)
+            if args.use_mal_store == False:
+                delayCheck(args.api_delay)
+            count += 1
+            continue
+        else:
+            print("[ "+str(count) + " / " + str(full_cache_size)+" ]")
+            print(ap_title)
+            print(mal_titles[0])
+            needs_check += 1
+
+        print(flush=True)
+        count += 1
+        if args.use_mal_store == False:
+            delayCheck(args.api_delay)
+    print("Needs checking: "+str(needs_check))
+
+def get_mal_titles_by_id(mal_id):
+    malData = get_mal_data_by_id(mal_id)
+    #print(malData)
+    malTitles = malGetTitles(malData)
+
+    return malTitles
+
+def get_mal_data_by_id(mal_id):
+    if args.use_mal_store:
+        return get_mal_store_data_by_id(mal_id)
+
+    try:
+        headers = {'X-MAL-CLIENT-ID': MAL_CLIENT_ID}
+        query = urllib.parse.quote_plus(str(mal_id))
+        fields = "id,title,alternative_titles,start_date,end_date,media_type,num_episodes,start_season,source,average_episode_duration,studios"
+        url = "https://api.myanimelist.net/v2/anime/" + query + "?fields="+fields + "&nsfw=true"
+        mal = requests.get(url, headers=headers, timeout=6)
+        # print("Status Code: "+str(mal.status_code))
+        if mal.status_code != 200:
+            logger.error("MAL API Error: "+str(mal.status_code)+" --- ID: " + mal_id)
+            return False
+        malFile = mal.json()
+    except:
+        logger.error("MAL request failed -- ID: " + mal_id)
+        return False
+
+    malData = json.loads(json.dumps(malFile))
+    #print(malData)
+
+    return malData
+
+def mal_api_store():
+    if args.mal_api == False:
+        print("Error: MAL API access required.")
+        return
+    
+    count = 1
+
+    global cache_data
+    full_cache_size = len(cache_data)
+
+    if args.offset > 0:
+        cache_data = cache_data[args.offset:]
+        count = args.offset + 1
+    
+    for cache_info in cache_data:
+        #print("[MAL Cache]: "+str(count) + " / " + str(full_cache_size))
+        ap_title = cache_info[0]
+        mal_id = cache_info[1]
+
+        if mal_store_check_by_id(mal_id):
+            #print("MAL cache found: " + mal_id)
+            #print(flush=True)
+            count += 1
+            continue
+        else:
+            print(ap_title)
+            mal_data = get_mal_data_by_id(mal_id)
+            if mal_data:
+                mal_api_json_cache(mal_data)
+
+        print(flush=True)
+        count += 1
+        #delayCheck(args.api_delay)
+        time.sleep(2.0)
+
+def mal_api_json_cache(data):
+    mal_id = data['id']
+    fname = 'mal_store/'+str(mal_id)+'.json'
+
+    if mal_store_check_by_fname(fname):
+        return
+
+    with open(fname, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    
+    print("Caching MAL data: " + data['title'] + " --> " + str(mal_id)+'.json')
+
+def mal_store_check_by_fname(fname):
+    if os.path.isfile(fname):
+        return True
+    return False
+
+def mal_store_check_by_id(mal_id):
+    fname = 'mal_store/'+str(mal_id)+'.json'
+
+    if os.path.isfile(fname):
+        return True
+    return False
+
+def get_mal_store_data_by_id(mal_id):
+    fname = 'mal_store/'+str(mal_id)+'.json'
+    with open(fname, encoding='utf-8') as f:
+        data = json.load(f)
+    return data
+
 def main():
+    if args.mal_api_store:
+        mal_api_store()
+        return
+
+    if args.cache_verify:
+        cache_verify()
+        return
+
     if args.search_queue:
         searchQueue()
         return
